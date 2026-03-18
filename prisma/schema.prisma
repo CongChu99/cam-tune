@@ -39,18 +39,18 @@ enum SkillLevel {
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
-  id                    String   @id @default(uuid())
-  email                 String   @unique
+  id                    String     @id @default(uuid())
+  email                 String     @unique
   skillLevel            SkillLevel @default(BEGINNER)
   uiMode                UiMode     @default(BEGINNER)
   openaiApiKeyEncrypted String?
   openaiModelId         String?
-  createdAt             DateTime @default(now())
+  createdAt             DateTime   @default(now())
 
-  cameraProfiles  CameraProfile[]
-  shootSessions   ShootSession[]
-  settingsCards   SettingsCard[]
-  savedCards      SavedCard[]
+  cameraProfiles CameraProfile[]
+  shootSessions  ShootSession[]
+  settingsCards  SettingsCard[]
+  savedCards     SavedCard[]
 }
 
 model CameraDatabase {
@@ -101,62 +101,62 @@ model CameraProfile {
 }
 
 model LensProfile {
-  id                  String   @id @default(uuid())
-  cameraProfileId     String
-  focalLengthMm       Int
-  maxAperture         Decimal
-  minAperture         Decimal
-  isStabilized        Boolean  @default(false)
-  stabilizationStops  Decimal?
+  id                 String   @id @default(uuid())
+  cameraProfileId    String
+  focalLengthMm      Int
+  maxAperture        Decimal
+  minAperture        Decimal
+  isStabilized       Boolean  @default(false)
+  stabilizationStops Decimal?
 
   cameraProfile CameraProfile @relation(fields: [cameraProfileId], references: [id], onDelete: Cascade)
 }
 
 model ShootSession {
-  id              String    @id @default(uuid())
-  userId          String
-  cameraProfileId String
-  lat             Decimal
-  lng             Decimal
-  locationName    String?
-  startedAt       DateTime
-  endedAt         DateTime?
+  id               String    @id @default(uuid())
+  userId           String
+  cameraProfileId  String
+  lat              Decimal
+  lng              Decimal
+  locationName     String?
+  startedAt        DateTime
+  endedAt          DateTime?
   /// JSON snapshot of weather at time of session
-  weatherSnapshot Json
+  weatherSnapshot  Json
   /// JSON snapshot of sun position/angle data
-  sunSnapshot     Json
-  sceneType       String?
+  sunSnapshot      Json
+  sceneType        String?
   /// AI-generated recommendation JSON (cached from AIRecommendation)
   aiRecommendation Json?
   /// Actual settings used (filled in after shoot)
-  actualSettings  Json?
+  actualSettings   Json?
   /// Rating 1–5 (CHECK constraint enforced at app layer; SQLite has no CHECK via Prisma)
-  userRating      Int?
-  notes           String?
-  isPlan          Boolean   @default(false)
-  createdAt       DateTime  @default(now())
+  userRating       Int?
+  notes            String?
+  isPlan           Boolean   @default(false)
+  createdAt        DateTime  @default(now())
 
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cameraProfile  CameraProfile @relation(fields: [cameraProfileId], references: [id])
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cameraProfile     CameraProfile      @relation(fields: [cameraProfileId], references: [id], onDelete: Restrict)
   aiRecommendations AIRecommendation[]
-  settingsCards  SettingsCard[]
+  settingsCards     SettingsCard[]
 
   @@index([userId])
   @@index([startedAt])
 }
 
 model AIRecommendation {
-  id                 String   @id @default(uuid())
-  sessionId          String
-  modelId            String
-  inputSignals       Json
-  rawResponse        Json
-  parsedSuggestions  Json
+  id                  String   @id @default(uuid())
+  sessionId           String
+  modelId             String
+  inputSignals        Json
+  rawResponse         Json
+  parsedSuggestions   Json
   /// Comma-separated confidence scores (e.g. "0.92,0.85,0.78")
-  confidenceScores   String
+  confidenceScores    String
   primarySignalDriver String?
-  latencyMs          Int?
-  createdAt          DateTime @default(now())
+  latencyMs           Int?
+  createdAt           DateTime @default(now())
 
   session ShootSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
