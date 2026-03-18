@@ -81,6 +81,7 @@ export default function MainPage() {
   // ── Camera feed ──────────────────────────────────────────────────────────
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
@@ -146,8 +147,12 @@ export default function MainPage() {
   const startCamera = useCallback(async () => {
     setCameraError(null)
     try {
+      // Stop existing stream before starting a new one
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+
       const s = await navigator.mediaDevices.getUserMedia({ video: true })
       setStream(s)
+      streamRef.current = s
       if (videoRef.current) {
         videoRef.current.srcObject = s
         videoRef.current.play()
@@ -160,8 +165,8 @@ export default function MainPage() {
   useEffect(() => {
     startCamera()
     return () => {
-      // Cleanup stream on unmount
-      stream?.getTracks().forEach((t) => t.stop())
+      // Cleanup stream on unmount using ref to avoid dependency issues
+      streamRef.current?.getTracks().forEach((t) => t.stop())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
