@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "currentState": "CODE",
+  "feature": {
+    "name": "CamTune — AI Camera Settings Advisor",
+    "slug": "cam-tune-ai-advisor",
+    "description": "App gợi ý thông số máy ảnh (ISO, khẩu độ, tốc độ chụp, white balance...) dựa trên phân tích AI về địa điểm người dùng đang đứng, phù hợp với từng dòng máy ảnh cụ thể."
+  },
+  "mode": "research",
+  "startedAt": "2026-03-18",
+  "completedStates": ["RESEARCH", "SPEC", "BEADS"],
+  "failedAttempts": 0,
+  "beadsEpic": "cam-tune-20a",
+  "doltRemote": null,
+  "worktree": null,
+  "prNumber": null,
+  "lastError": null
+}
