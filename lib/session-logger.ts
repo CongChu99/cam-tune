@@ -304,11 +304,12 @@ export async function exportSessions(
   // CSV — manual string building (no external library)
   const escapeCsv = (value: unknown): string => {
     const str = value === null || value === undefined ? '' : String(value)
-    // Wrap in quotes if the value contains commas, quotes, or newlines
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`
+    // Prevent formula injection in spreadsheet applications
+    const safe = /^[=+@\-]/.test(str) ? `\t${str}` : str
+    if (safe.includes(',') || safe.includes('"') || safe.includes('\n')) {
+      return `"${safe.replace(/"/g, '""')}"`
     }
-    return str
+    return safe
   }
 
   const header = 'id,location,date,camera,iso,aperture,shutter,rating,notes'
