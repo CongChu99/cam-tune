@@ -108,26 +108,7 @@ export function OpenAISettingsForm({ isConnected, currentModelId }: Props) {
     setSaveStatus("saving");
 
     try {
-      // We re-call validate with the existing encrypted key; instead we use
-      // a dedicated PATCH-like approach via the validate endpoint with
-      // just the modelId update. Since validate requires the apiKey,
-      // we use the models endpoint doesn't support PATCH yet.
-      // Workaround: POST validate with no apiKey change — handled by
-      // a dedicated model-update fetch to the same validate route.
-      //
-      // For a clean UX, we POST to validate with an empty apiKey to update
-      // only the model. The server handles the case where apiKey is missing
-      // by checking the currently stored key if modelId is provided separately.
-      //
-      // Actually, the cleaner approach is a separate PATCH to the user model.
-      // We'll use a simple fetch to the models endpoint with POST semantics
-      // via the validate endpoint using a flag.
-      //
-      // Simplest correct approach: POST /api/auth/openai/validate with
-      // { modelId } only — but the validate route requires apiKey.
-      //
-      // We add a dedicated model-update route. For now, use the validate
-      // endpoint with the "update model only" pattern:
+      // PATCH /api/auth/openai/model to update the selected model in DB
       const res = await fetch("/api/auth/openai/model", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -146,12 +127,23 @@ export function OpenAISettingsForm({ isConnected, currentModelId }: Props) {
   }
 
   // --- Disconnect -----------------------------------------------------------
-  function handleDisconnect() {
-    setConnected(false);
-    setModels([]);
-    setSelectedModel("");
-    setApiKey("");
-    setError(null);
+  async function handleDisconnect() {
+    try {
+      const res = await fetch("/api/auth/openai/disconnect", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (res.ok) {
+        setConnected(false);
+        setModels([]);
+        setSelectedModel("");
+        setApiKey("");
+        setError(null);
+      }
+    } catch {
+      // Silently ignore on error
+    }
   }
 
   return (
