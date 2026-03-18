@@ -55,6 +55,9 @@ export interface RecommendationResult {
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
+// Valid shoot intents — whitelist for prompt injection prevention
+const VALID_INTENTS = ['portrait', 'landscape', 'street', 'event', 'astro', 'macro', 'general'] as const
+
 /**
  * Builds the OpenAI system prompt incorporating camera DNA and environmental context.
  */
@@ -67,6 +70,9 @@ export function buildSystemPrompt(
 ): string {
   const db = cameraProfile.cameraDatabase
   const overrides = cameraProfile.customOverrides as Record<string, unknown> | null
+
+  // Validate shootIntent against whitelist
+  const safeIntent = VALID_INTENTS.includes(shootIntent as any) ? shootIntent : 'general'
 
   // Camera specs — prefer DB values, allow overrides
   const brand = String(overrides?.brand ?? cameraProfile.brand)
@@ -103,7 +109,7 @@ Current conditions:
 - Sun altitude: ${sun.altitude}°
 - Time: ${timeString} (${lightCondition})
 
-Shoot intent: ${shootIntent ?? 'general'}
+Shoot intent: ${safeIntent}
 
 Return EXACTLY this JSON (no markdown, no explanation):
 {
@@ -144,8 +150,10 @@ Provide exactly 3 suggestions ordered by confidence descending.`
 export function buildUserPrompt(
   shootIntent?: ShootIntent
 ): string {
-  const intentNote = shootIntent
-    ? `I'm shooting ${shootIntent} photography. `
+  // Validate shootIntent against whitelist
+  const safeIntent = VALID_INTENTS.includes(shootIntent as any) ? shootIntent : 'general'
+  const intentNote = safeIntent !== 'general'
+    ? `I'm shooting ${safeIntent} photography. `
     : ''
 
   return `${intentNote}Please analyze this scene and provide exactly 3 camera settings recommendations, ordered by confidence (highest first). Include a detailed explanation for each setting so I can learn why each choice was made.`
@@ -155,11 +163,12 @@ export function buildUserPrompt(
 
 /**
  * Strips markdown code fences (```json ... ``` or ``` ... ```) from a string.
+ * Handles multiple fences and language tags robustly.
  */
 function stripMarkdownFences(text: string): string {
   return text
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
+    .replace(/^```[\w]*\n?/gm, '')  // opening fences with optional language
+    .replace(/^```\s*$/gm, '')       // closing fences
     .trim()
 }
 
@@ -176,8 +185,20 @@ function coerceSuggestion(raw: Record<string, unknown>, index: number): Suggesti
   const confidence = Math.min(100, Math.max(0, Number(raw.confidence ?? 0)))
   const primaryDriver = String(raw.primaryDriver ?? '')
 
-  if (!iso || !aperture || !shutter) {
-    throw new Error(`Suggestion[${index}] missing critical fields (iso/aperture/shutter)`)
+  // Validate ISO range: 50–2,000,000
+  if (!iso || iso < 50 || iso > 2000000) {
+    throw new Error(`Suggestion[${index}] ISO must be between 50 and 2,000,000, got ${iso}`)
+  }
+
+  // Validate aperture range: f/0.7–f/64
+  if (!aperture || aperture < 0.7 || aperture > 64) {
+    throw new Error(`Suggestion[${index}] aperture must be between f/0.7 and f/64, got f/${aperture}`)
+  }
+
+  // Validate shutter speed format: e.g., "1/500", "2.5", "1/8000", "2.5s"
+  const shutterRegex = /^(\d+(\.\d+)?|\d+\/\d+)s?$/i
+  if (!shutter || !shutterRegex.test(shutter)) {
+    throw new Error(`Suggestion[${index}] shutter speed format invalid (expected "1/500", "2.5", or "1/8000s"), got "${shutter}"`)
   }
 
   const suggestion: Suggestion = {

@@ -326,9 +326,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     })
 
-    const confidenceScores = suggestions
-      .map((s) => (s.confidence / 100).toFixed(2))
-      .join(',')
+    const confidenceScores = JSON.stringify(suggestions.map(s => s.confidence))
 
     const rec = await prisma.aIRecommendation.create({
       data: {
