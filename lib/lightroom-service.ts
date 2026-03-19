@@ -146,6 +146,7 @@ export async function exchangeCodeForTokens(
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!res.ok) {
@@ -178,6 +179,7 @@ export async function refreshTokenRequest(refreshToken: string): Promise<OAuthTo
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!res.ok) {
@@ -278,6 +280,7 @@ async function getCatalogId(accessToken: string): Promise<string> {
       Authorization: `Bearer ${accessToken}`,
       "X-API-Key": ADOBE_CLIENT_ID,
     },
+    signal: AbortSignal.timeout(5000),
   });
 
   if (!res.ok) {
@@ -320,6 +323,7 @@ async function uploadXmpSidecar(
         },
       },
     }),
+    signal: AbortSignal.timeout(5000),
   });
 
   if (!createRes.ok) {
@@ -342,6 +346,7 @@ async function uploadXmpSidecar(
         "X-Generate-Renditions": "false",
       },
       body: xmpContent,
+      signal: AbortSignal.timeout(5000),
     }
   );
 
@@ -360,7 +365,10 @@ async function uploadXmpSidecar(
  */
 export async function enqueueSyncItem(userId: string, sessionId: string): Promise<void> {
   const redis = getRedis();
-  if (!redis) return; // Silently skip if Redis not configured
+  if (!redis) {
+    console.warn('[LightroomService] Upstash Redis not configured — sync item not queued for retry')
+    return
+  }
   await redis.rpush(SYNC_QUEUE_KEY(userId), sessionId);
 }
 
@@ -503,17 +511,46 @@ export const LightroomService: IntegrationService & {
     }
 
     // Retry pending queued sessions first
-    const queued = await dequeuePendingSessions(userId);
+    const queuedIds = await dequeuePendingSessions(userId);
 
     let synced = 0;
     const errors: string[] = [];
 
-    // Process the queued backlog (we don't have full data, just session IDs —
-    // for a real implementation this would fetch from DB; here we skip re-upload)
-    // This block is intentionally minimal; a cron job would handle full retries.
-    if (queued.length > 0) {
+    // Re-fetch queued sessions from DB and re-upload
+    if (queuedIds.length > 0) {
+      const queuedSessions = await prisma.shootSession.findMany({
+        where: { id: { in: queuedIds }, userId },
+      });
+
+      let queuedSynced = 0;
+      let queuedFailed = 0;
+      for (const s of queuedSessions) {
+        const aiRec = s.aiRecommendation as Record<string, unknown> | null;
+        const actualSettings = s.actualSettings as Record<string, unknown> | null;
+        const sessionData: XmpSessionData = {
+          sessionId: s.id,
+          iso: (actualSettings?.iso ?? aiRec?.iso) as number | string | undefined,
+          aperture: (actualSettings?.aperture ?? aiRec?.aperture) as number | string | undefined,
+          shutterSpeed: (actualSettings?.shutterSpeed ?? aiRec?.shutterSpeed) as string | undefined,
+          whiteBalance: (actualSettings?.whiteBalance ?? aiRec?.whiteBalance) as string | undefined,
+          locationName: s.locationName ?? undefined,
+          modifyDate: s.endedAt ?? s.startedAt,
+        };
+
+        try {
+          await uploadXmpSidecar(accessToken, catalogId, sessionData);
+          synced++;
+          queuedSynced++;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`${s.id} (retry): ${msg}`);
+          await enqueueSyncItem(userId, s.id);
+          queuedFailed++;
+        }
+      }
+
       console.info(
-        `[LightroomService] ${queued.length} queued session(s) found for user ${userId} — dequeued`
+        `[LightroomService] Queued retry for user ${userId}: ${queuedSynced} succeeded, ${queuedFailed} re-enqueued`
       );
     }
 
