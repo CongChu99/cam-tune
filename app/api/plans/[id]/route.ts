@@ -85,6 +85,9 @@ export async function PATCH(
     if (!isNaN(d.getTime())) updateData.completedAt = d
   }
   if (body.completedAt === null) updateData.completedAt = null
+  if (typeof body.forecastSnapshot === 'string' || body.forecastSnapshot === null) {
+    updateData.forecastSnapshot = body.forecastSnapshot
+  }
 
   try {
     const plan = await prisma.shootPlan.update({
