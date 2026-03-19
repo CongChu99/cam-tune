@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "cam_tune",
+  "project_id": "0d31ec71-e870-48c9-b61f-82aed610c5a4"
+}

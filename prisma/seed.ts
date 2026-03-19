@@ -1,0 +1,372 @@
+import * as dotenv from "dotenv";
+import * as path from "path";
+import * as nodeUrl from "url";
+
+// Load local env first (overrides .env for local dev)
+dotenv.config({ path: ".env.local" });
+dotenv.config({ path: ".env" });
+
+import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaClient } from "../lib/generated/prisma";
+
+const dbUrl = process.env.DATABASE_URL ?? "file:./dev.db";
+
+// libsql requires absolute file:// URLs.
+// Convert "file:./dev.db" or "file:dev.db" → "file:///absolute/path/dev.db"
+function toAbsoluteLibsqlUrl(rawUrl: string): string {
+  if (rawUrl.startsWith("file:")) {
+    const filePart = rawUrl.slice(5); // strip "file:"
+    const absPath = path.resolve(process.cwd(), filePart);
+    return nodeUrl.pathToFileURL(absPath).href;
+  }
+  return rawUrl;
+}
+
+const libsqlUrl = toAbsoluteLibsqlUrl(dbUrl);
+
+// In Prisma v7, PrismaLibSql takes the config object directly (url + authToken)
+const adapter = new PrismaLibSql({ url: libsqlUrl });
+const prisma = new PrismaClient({ adapter });
+
+const cameras = [
+  {
+    brand: "Sony",
+    model: "A7 IV",
+    slug: "sony-a7-iv",
+    sensorSize: "FULL_FRAME" as const,
+    pixelCountMp: 33,
+    baseIso: 100,
+    maxUsableIso: 12800,
+    maxNativeIso: 51200,
+    ibis: true,
+    ibisStops: 5.5,
+    dualNativeIso: false,
+    releaseYear: 2021,
+    mount: "Sony E",
+  },
+  {
+    brand: "Sony",
+    model: "A7C II",
+    slug: "sony-a7c-ii",
+    sensorSize: "FULL_FRAME" as const,
+    pixelCountMp: 33,
+    baseIso: 100,
+    maxUsableIso: 12800,
+    maxNativeIso: 51200,
+    ibis: true,
+    ibisStops: 5.0,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Sony E",
+  },
+  {
+    brand: "Sony",
+    model: "A6700",
+    slug: "sony-a6700",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 26,
+    baseIso: 100,
+    maxUsableIso: 6400,
+    maxNativeIso: 32000,
+    ibis: true,
+    ibisStops: 5.0,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Sony E",
+  },
+  {
+    brand: "Canon",
+    model: "EOS R5",
+    slug: "canon-eos-r5",
+    sensorSize: "FULL_FRAME" as const,
+    pixelCountMp: 45,
+    baseIso: 100,
+    maxUsableIso: 12800,
+    maxNativeIso: 51200,
+    ibis: true,
+    ibisStops: 8.0,
+    dualNativeIso: false,
+    releaseYear: 2020,
+    mount: "Canon RF",
+  },
+  {
+    brand: "Canon",
+    model: "EOS R6 Mark II",
+    slug: "canon-eos-r6-ii",
+    sensorSize: "FULL_FRAME" as const,
+    pixelCountMp: 24.2,
+    baseIso: 100,
+    maxUsableIso: 25600,
+    maxNativeIso: 102400,
+    ibis: true,
+    ibisStops: 8.0,
+    dualNativeIso: false,
+    releaseYear: 2022,
+    mount: "Canon RF",
+  },
+  {
+    brand: "Canon",
+    model: "EOS R50",
+    slug: "canon-eos-r50",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 24.2,
+    baseIso: 100,
+    maxUsableIso: 6400,
+    maxNativeIso: 32000,
+    ibis: false,
+    ibisStops: null,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Canon RF",
+  },
+  {
+    brand: "Fujifilm",
+    model: "X-T5",
+    slug: "fujifilm-x-t5",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 40.2,
+    baseIso: 125,
+    maxUsableIso: 6400,
+    maxNativeIso: 12800,
+    ibis: true,
+    ibisStops: 7.0,
+    dualNativeIso: false,
+    releaseYear: 2022,
+    mount: "Fujifilm X",
+  },
+  {
+    brand: "Fujifilm",
+    model: "X-S20",
+    slug: "fujifilm-x-s20",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 26.1,
+    baseIso: 160,
+    maxUsableIso: 6400,
+    maxNativeIso: 12800,
+    ibis: true,
+    ibisStops: 6.0,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Fujifilm X",
+  },
+  {
+    brand: "Fujifilm",
+    model: "X100VI",
+    slug: "fujifilm-x100vi",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 40.2,
+    baseIso: 125,
+    maxUsableIso: 6400,
+    maxNativeIso: 12800,
+    ibis: true,
+    ibisStops: 6.0,
+    dualNativeIso: false,
+    releaseYear: 2024,
+    mount: "Fixed",
+  },
+  {
+    brand: "Nikon",
+    model: "Z8",
+    slug: "nikon-z8",
+    sensorSize: "FULL_FRAME" as const,
+    pixelCountMp: 45.7,
+    baseIso: 64,
+    maxUsableIso: 25600,
+    maxNativeIso: 102400,
+    ibis: true,
+    ibisStops: 6.0,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Nikon Z",
+  },
+  {
+    brand: "Nikon",
+    model: "Z6 III",
+    slug: "nikon-z6-iii",
+    sensorSize: "FULL_FRAME" as const,
+    pixelCountMp: 24.5,
+    baseIso: 100,
+    maxUsableIso: 12800,
+    maxNativeIso: 64000,
+    ibis: true,
+    ibisStops: 6.0,
+    dualNativeIso: false,
+    releaseYear: 2024,
+    mount: "Nikon Z",
+  },
+  {
+    brand: "Nikon",
+    model: "Zfc",
+    slug: "nikon-zfc",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 20.9,
+    baseIso: 100,
+    maxUsableIso: 6400,
+    maxNativeIso: 51200,
+    ibis: false,
+    ibisStops: null,
+    dualNativeIso: false,
+    releaseYear: 2021,
+    mount: "Nikon Z",
+  },
+  {
+    brand: "OM System",
+    model: "OM-5",
+    slug: "om-system-om-5",
+    sensorSize: "MFT" as const,
+    pixelCountMp: 20.4,
+    baseIso: 200,
+    maxUsableIso: 6400,
+    maxNativeIso: 25600,
+    ibis: true,
+    ibisStops: 7.5,
+    dualNativeIso: false,
+    releaseYear: 2022,
+    mount: "Micro Four Thirds",
+  },
+  {
+    brand: "Panasonic",
+    model: "Lumix G9 II",
+    slug: "panasonic-g9-ii",
+    sensorSize: "MFT" as const,
+    pixelCountMp: 25.2,
+    baseIso: 100,
+    maxUsableIso: 6400,
+    maxNativeIso: 25600,
+    ibis: true,
+    ibisStops: 8.0,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Micro Four Thirds",
+  },
+  {
+    brand: "Panasonic",
+    model: "Lumix S5 II",
+    slug: "panasonic-s5-ii",
+    sensorSize: "FULL_FRAME" as const,
+    pixelCountMp: 24.2,
+    baseIso: 100,
+    maxUsableIso: 12800,
+    maxNativeIso: 51200,
+    ibis: true,
+    ibisStops: 5.0,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Leica L",
+  },
+  {
+    brand: "Leica",
+    model: "Q3",
+    slug: "leica-q3",
+    sensorSize: "FULL_FRAME" as const,
+    pixelCountMp: 60,
+    baseIso: 50,
+    maxUsableIso: 6400,
+    maxNativeIso: 100000,
+    ibis: false,
+    ibisStops: null,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Fixed",
+  },
+  {
+    brand: "Ricoh",
+    model: "GR IIIx",
+    slug: "ricoh-gr-iiix",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 24.2,
+    baseIso: 100,
+    maxUsableIso: 6400,
+    maxNativeIso: 102400,
+    ibis: false,
+    ibisStops: null,
+    dualNativeIso: false,
+    releaseYear: 2021,
+    mount: "Fixed",
+  },
+  {
+    brand: "Sony",
+    model: "ZV-E10 II",
+    slug: "sony-zv-e10-ii",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 26,
+    baseIso: 100,
+    maxUsableIso: 6400,
+    maxNativeIso: 32000,
+    ibis: false,
+    ibisStops: null,
+    dualNativeIso: false,
+    releaseYear: 2024,
+    mount: "Sony E",
+  },
+  {
+    brand: "Canon",
+    model: "EOS R100",
+    slug: "canon-eos-r100",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 24.1,
+    baseIso: 100,
+    maxUsableIso: 6400,
+    maxNativeIso: 25600,
+    ibis: false,
+    ibisStops: null,
+    dualNativeIso: false,
+    releaseYear: 2023,
+    mount: "Canon RF",
+  },
+  {
+    brand: "Nikon",
+    model: "Z50 II",
+    slug: "nikon-z50-ii",
+    sensorSize: "APS_C" as const,
+    pixelCountMp: 20.9,
+    baseIso: 100,
+    maxUsableIso: 6400,
+    maxNativeIso: 51200,
+    ibis: false,
+    ibisStops: null,
+    dualNativeIso: false,
+    releaseYear: 2024,
+    mount: "Nikon Z",
+  },
+];
+
+async function main() {
+  console.log("Seeding CameraDatabase with 20 camera models...");
+
+  for (const camera of cameras) {
+    await prisma.cameraDatabase.upsert({
+      where: { slug: camera.slug },
+      update: {},
+      create: {
+        brand: camera.brand,
+        model: camera.model,
+        slug: camera.slug,
+        sensorSize: camera.sensorSize,
+        pixelCountMp: camera.pixelCountMp ?? null,
+        baseIso: camera.baseIso,
+        maxUsableIso: camera.maxUsableIso,
+        maxNativeIso: camera.maxNativeIso,
+        ibis: camera.ibis,
+        ibisStops: camera.ibisStops ?? null,
+        dualNativeIso: camera.dualNativeIso,
+        dualNativeIsoValues: null,
+        releaseYear: camera.releaseYear ?? null,
+        mount: camera.mount ?? null,
+      },
+    });
+    console.log(`  + ${camera.brand} ${camera.model}`);
+  }
+
+  const count = await prisma.cameraDatabase.count();
+  console.log(`\nSeed complete. CameraDatabase now has ${count} records.`);
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

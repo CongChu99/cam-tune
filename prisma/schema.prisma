@@ -1,0 +1,268 @@
+// CamTune — AI Camera Settings Advisor
+// Full schema for all models.
+// Local dev uses SQLite (file:./dev.db); production uses PostgreSQL via Supabase.
+// DB URL is provided via prisma.config.ts (reads DATABASE_URL from env).
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+// SQLite does not have native enums — Prisma maps these to String columns.
+
+enum SensorSize {
+  FULL_FRAME
+  APS_C
+  MFT
+  ONE_INCH
+  MEDIUM_FORMAT
+  OTHER
+}
+
+enum UiMode {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id                              String     @id @default(uuid())
+  email                           String     @unique
+  skillLevel                      SkillLevel @default(BEGINNER)
+  uiMode                          UiMode     @default(BEGINNER)
+  openaiApiKeyEncrypted           String?
+  openaiModelId                   String?
+  lightroomAccessTokenEncrypted   String?
+  lightroomRefreshTokenEncrypted  String?
+  lightroomTokenExpiry            DateTime?
+  lightroomTokenIssuedAt          DateTime?
+  captureOneAccessTokenEncrypted  String?
+  captureOneRefreshTokenEncrypted String?
+  captureOneTokenExpiry           DateTime?
+  captureOneTokenIssuedAt         DateTime?
+  createdAt                       DateTime   @default(now())
+
+  cameraProfiles CameraProfile[]
+  shootSessions  ShootSession[]
+  settingsCards  SettingsCard[]
+  savedCards     SavedCard[]
+  likedCards     CardLike[]
+  reportedCards  CardReport[]
+  shootPlans     ShootPlan[]
+}
+
+model CameraDatabase {
+  id                  String     @id @default(uuid())
+  brand               String
+  model               String
+  slug                String     @unique
+  sensorSize          SensorSize
+  pixelCountMp        Decimal?
+  baseIso             Int
+  maxUsableIso        Int
+  maxNativeIso        Int
+  ibis                Boolean    @default(false)
+  ibisStops           Decimal?
+  dualNativeIso       Boolean    @default(false)
+  /// Comma-separated ISO values for dual native ISO (e.g. "800,12800").
+  /// SQLite dev: String. Production (PostgreSQL) would use Int[].
+  dualNativeIsoValues String?
+  dynamicRangeEv      Decimal?
+  releaseYear         Int?
+  mount               String?
+  updatedAt           DateTime   @updatedAt
+
+  cameraProfiles CameraProfile[]
+}
+
+model CameraProfile {
+  id               String   @id @default(uuid())
+  userId           String
+  brand            String
+  model            String
+  cameraDatabaseId String?
+  isActive         Boolean  @default(false)
+  isUserEntered    Boolean  @default(false)
+  ibisVerified     Boolean  @default(false)
+  /// JSON object for user overrides to camera database specs
+  customOverrides  Json?
+  createdAt        DateTime @default(now())
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cameraDatabase CameraDatabase? @relation(fields: [cameraDatabaseId], references: [id])
+  lensProfiles   LensProfile[]
+  shootSessions  ShootSession[]
+
+  /// Only one active profile per user — enforced at application layer.
+  /// (SQLite partial indexes are not supported in Prisma migrations; enforce in app code.)
+  @@index([userId, isActive])
+}
+
+model LensProfile {
+  id                 String   @id @default(uuid())
+  cameraProfileId    String
+  focalLengthMm      Int
+  maxAperture        Decimal
+  minAperture        Decimal
+  isStabilized       Boolean  @default(false)
+  stabilizationStops Decimal?
+
+  cameraProfile CameraProfile @relation(fields: [cameraProfileId], references: [id], onDelete: Cascade)
+}
+
+model ShootSession {
+  id               String    @id @default(uuid())
+  userId           String
+  cameraProfileId  String
+  lat              Decimal
+  lng              Decimal
+  locationName     String?
+  startedAt        DateTime
+  endedAt          DateTime?
+  /// JSON snapshot of weather at time of session
+  weatherSnapshot  Json
+  /// JSON snapshot of sun position/angle data
+  sunSnapshot      Json
+  sceneType        String?
+  /// AI-generated recommendation JSON (cached from AIRecommendation)
+  aiRecommendation Json?
+  /// Actual settings used (filled in after shoot)
+  actualSettings   Json?
+  /// Capture One offline sync queue — stores {pending: string[]} of session IDs awaiting retry
+  captureOneSyncQueue Json?
+  /// Rating 1–5 (CHECK constraint enforced at app layer; SQLite has no CHECK via Prisma)
+  userRating       Int?
+  notes            String?
+  isPlan           Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cameraProfile     CameraProfile      @relation(fields: [cameraProfileId], references: [id], onDelete: Restrict)
+  aiRecommendations AIRecommendation[]
+  settingsCards     SettingsCard[]
+
+  @@index([userId])
+  @@index([startedAt])
+}
+
+model AIRecommendation {
+  id                  String   @id @default(uuid())
+  sessionId           String
+  modelId             String
+  inputSignals        Json
+  rawResponse         Json
+  parsedSuggestions   Json
+  /// Comma-separated confidence scores (e.g. "0.92,0.85,0.78")
+  confidenceScores    String
+  primarySignalDriver String?
+  latencyMs           Int?
+  createdAt           DateTime @default(now())
+
+  session ShootSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model SettingsCard {
+  id                String   @id @default(uuid())
+  userId            String
+  sessionId         String?
+  cameraModel       String
+  lat               Decimal
+  lng               Decimal
+  locationName      String
+  /// JSON settings object (shutter, aperture, ISO, etc.)
+  settings          Json
+  /// JSON weather conditions at time of card creation
+  weatherConditions Json?
+  photoUrl          String?
+  caption           String?
+  isPublic          Boolean  @default(false)
+  likesCount        Int      @default(0)
+  savesCount        Int      @default(0)
+  isFlagged         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session ShootSession? @relation(fields: [sessionId], references: [id])
+  savedBy SavedCard[]
+  likedBy CardLike[]
+  reports CardReport[]
+
+  @@index([userId])
+  @@index([isPublic, createdAt])
+}
+
+model SavedCard {
+  userId  String
+  cardId  String
+  savedAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card SettingsCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([userId, cardId])
+}
+
+model CardLike {
+  userId    String
+  cardId    String
+  createdAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card SettingsCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([userId, cardId])
+}
+
+model CardReport {
+  id        String   @id @default(uuid())
+  userId    String
+  cardId    String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card SettingsCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+}
+
+model ShootPlan {
+  id                String    @id @default(cuid())
+  userId            String
+  title             String
+  description       String?
+  plannedAt         DateTime
+  latitude          Float
+  longitude         Float
+  locationName      String?
+  sceneType         String
+  predictedIso      Int?
+  predictedAperture Float?
+  predictedShutter  String?
+  predictedWB       String?
+  predictedMetering String?
+  /// JSON snapshot of forecast weather conditions
+  forecastSnapshot  String?
+  notificationSent  Boolean   @default(false)
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([plannedAt])
+}
