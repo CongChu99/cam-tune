@@ -9,11 +9,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Camera, CalendarClock, History, Settings } from 'lucide-react'
+import { Camera, CalendarClock, History, Settings, Users } from 'lucide-react'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Camera', icon: Camera, ariaLabel: 'Camera' },
   { href: '/plan', label: 'Plans', icon: CalendarClock, ariaLabel: 'Shoot Plans' },
+  { href: '/community', label: 'Community', icon: Users, ariaLabel: 'Community' },
   { href: '/history', label: 'History', icon: History, ariaLabel: 'Session History' },
   { href: '/settings', label: 'Settings', icon: Settings, ariaLabel: 'Settings' },
 ] as const
