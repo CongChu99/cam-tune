@@ -10,6 +10,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { OpenAISettingsForm } from "./OpenAISettingsForm";
 
@@ -58,6 +59,23 @@ export default async function SettingsPage() {
           isConnected={isConnected}
           currentModelId={currentModelId}
         />
+      </section>
+
+      <section className="border rounded-lg p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold mb-1">Integrations</h2>
+            <p className="text-sm text-muted-foreground">
+              Connect to Adobe Lightroom and other tools to sync your session data.
+            </p>
+          </div>
+          <Link
+            href="/settings/integrations"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            Manage →
+          </Link>
+        </div>
       </section>
     </main>
   );

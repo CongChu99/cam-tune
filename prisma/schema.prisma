@@ -39,13 +39,17 @@ enum SkillLevel {
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
-  id                    String     @id @default(uuid())
-  email                 String     @unique
-  skillLevel            SkillLevel @default(BEGINNER)
-  uiMode                UiMode     @default(BEGINNER)
-  openaiApiKeyEncrypted String?
-  openaiModelId         String?
-  createdAt             DateTime   @default(now())
+  id                              String     @id @default(uuid())
+  email                           String     @unique
+  skillLevel                      SkillLevel @default(BEGINNER)
+  uiMode                          UiMode     @default(BEGINNER)
+  openaiApiKeyEncrypted           String?
+  openaiModelId                   String?
+  lightroomAccessTokenEncrypted   String?
+  lightroomRefreshTokenEncrypted  String?
+  lightroomTokenExpiry            DateTime?
+  lightroomTokenIssuedAt          DateTime?
+  createdAt                       DateTime   @default(now())
 
   cameraProfiles CameraProfile[]
   shootSessions  ShootSession[]
