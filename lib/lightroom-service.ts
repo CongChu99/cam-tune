@@ -380,9 +380,12 @@ export async function dequeuePendingSessions(userId: string): Promise<string[]> 
   if (!redis) return [];
 
   const key = SYNC_QUEUE_KEY(userId);
-  const items = await redis.lrange<string>(key, 0, -1);
-  if (items.length > 0) {
-    await redis.del(key);
+  const items: string[] = [];
+  // LPOP up to 100 items atomically
+  for (let i = 0; i < 100; i++) {
+    const item = await redis.lpop<string>(key);
+    if (item === null) break;
+    items.push(item);
   }
   return items;
 }
@@ -533,6 +536,12 @@ export const LightroomService: IntegrationService & {
           aperture: (actualSettings?.aperture ?? aiRec?.aperture) as number | string | undefined,
           shutterSpeed: (actualSettings?.shutterSpeed ?? aiRec?.shutterSpeed) as string | undefined,
           whiteBalance: (actualSettings?.whiteBalance ?? aiRec?.whiteBalance) as string | undefined,
+          aiConfidence:
+            typeof aiRec?.confidence === "number"
+              ? aiRec.confidence
+              : typeof aiRec?.aiConfidence === "number"
+              ? aiRec.aiConfidence
+              : undefined,
           locationName: s.locationName ?? undefined,
           modifyDate: s.endedAt ?? s.startedAt,
         };

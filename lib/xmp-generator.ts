@@ -19,6 +19,19 @@ export interface XmpSessionData {
 }
 
 /**
+ * Sanitizes a string for use as an XML element name.
+ * Replaces any character not in [a-zA-Z0-9_-] with an underscore,
+ * and ensures the name starts with a letter or underscore (not a digit).
+ */
+function sanitizeXmlName(key: string): string {
+  let name = key.replace(/[^a-zA-Z0-9_-]/g, "_");
+  if (/^[0-9]/.test(name)) {
+    name = "_" + name;
+  }
+  return name;
+}
+
+/**
  * Escapes a value for inclusion in an XML attribute or text node.
  */
 function escapeXml(value: string): string {
@@ -82,7 +95,7 @@ export function generateXmp(data: XmpSessionData): string {
   // Extra fields
   if (data.extras) {
     for (const [key, value] of Object.entries(data.extras)) {
-      const safeKey = escapeXml(key);
+      const safeKey = sanitizeXmlName(key);
       lines.push(
         `      <camtune:${safeKey}>${escapeXml(String(value))}</camtune:${safeKey}>`
       );
