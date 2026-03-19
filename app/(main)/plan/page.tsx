@@ -93,6 +93,9 @@ export default function PlanPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
+  // Action error state (delete / mark complete)
+  const [actionError, setActionError] = useState<string | null>(null)
+
   // GPS state for proximity detection
   const [userCoords, setUserCoords] = useState<LatLng | null>(null)
   const notifiedRef = useRef<Set<string>>(new Set())
@@ -257,10 +260,17 @@ export default function PlanPage() {
   }
 
   async function handleDelete(id: string) {
-    const res = await fetch(`/api/plans/${id}`, { method: 'DELETE' })
-    if (res.ok) {
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/plans/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error ?? `HTTP ${res.status}`)
+      }
       setPlans((prev) => prev.filter((p) => p.id !== id))
       setTotal((t) => Math.max(0, t - 1))
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to delete plan.')
     }
   }
 
@@ -285,14 +295,21 @@ export default function PlanPage() {
       body.forecastSnapshot = forecastSnapshotUpdate
     }
 
-    const res = await fetch(`/api/plans/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (res.ok) {
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/plans/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const resBody = await res.json().catch(() => ({}))
+        throw new Error(resBody?.error ?? `HTTP ${res.status}`)
+      }
       const data = await res.json()
       setPlans((prev) => prev.map((p) => p.id === id ? data.plan : p))
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to mark plan as complete.')
     }
   }
 
@@ -347,6 +364,24 @@ export default function PlanPage() {
               onClick={() => setUpcomingAlert(null)}
               className="shrink-0 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300"
               aria-label="Dismiss reminder"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+
+        {/* ── Action error (delete / mark complete) ── */}
+        {actionError && (
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/40 dark:bg-red-900/20 dark:text-red-400"
+          >
+            <span>{actionError}</span>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className="shrink-0 text-red-400 hover:text-red-600 dark:hover:text-red-300"
+              aria-label="Dismiss error"
             >
               <X className="size-4" aria-hidden="true" />
             </button>
@@ -541,6 +576,9 @@ export default function PlanPage() {
             })}
           </section>
         )}
+
+        {/* Spacer to prevent content going behind bottom nav */}
+        <div className="h-16" aria-hidden="true" />
       </main>
     </div>
   )

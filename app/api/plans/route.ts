@@ -24,6 +24,15 @@ import { getLocationContext, getWeatherForecast } from '@/lib/weather-service'
 import { getSunPosition } from '@/lib/suncalc-wrapper'
 import { decryptApiKey, createClient } from '@/lib/openai-client'
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const VALID_SCENE_TYPES = new Set([
+  'landscape', 'portrait', 'street', 'event', 'astro', 'macro',
+  'architecture', 'wildlife', 'travel', 'sports',
+])
+
+const LOCATION_NAME_MAX_LENGTH = 200
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CreatePlanBody {
@@ -83,16 +92,13 @@ async function generatePredictedSettings(
   }
 
   const sunPos = getSunPosition(latitude, longitude, plannedAt)
-  const hour = plannedAt.getHours()
+  const sunAltitudeDeg = sunPos.altitudeDeg
 
-  const timeOfDay =
-    hour < 6 ? 'night' :
-    hour < 9 ? 'early morning / golden hour' :
-    hour < 11 ? 'morning' :
-    hour < 14 ? 'midday' :
-    hour < 17 ? 'afternoon' :
-    hour < 20 ? 'evening / golden hour' :
-    'night'
+  const sunlight =
+    sunAltitudeDeg > 30 ? 'bright midday sun'
+    : sunAltitudeDeg > 0 ? 'low sun / golden hour'
+    : sunAltitudeDeg > -6 ? 'civil twilight'
+    : 'nighttime / no direct sunlight'
 
   const weatherDesc = weather
     ? `Cloud cover: ${weather.cloudCoverPct}%, UV index: ${weather.uvIndex}, ` +
@@ -102,7 +108,7 @@ async function generatePredictedSettings(
 
   const prompt = `You are an expert photography assistant. A photographer is planning a ${sceneType} shoot at:
 - Location: ${locationName}
-- Date/time: ${plannedAt.toISOString()} (${timeOfDay})
+- Date/time: ${plannedAt.toISOString()} (${sunlight})
 - Sun altitude: ${sunPos.altitudeDeg.toFixed(1)}°, azimuth: ${sunPos.azimuthDeg.toFixed(1)}°
 - ${weatherDesc}
 
@@ -126,7 +132,14 @@ Return EXACTLY this JSON (no markdown, no explanation):
 
   const raw = completion.choices[0]?.message?.content ?? ''
   const cleaned = raw.replace(/^```[\w]*\n?/gm, '').replace(/^```\s*$/gm, '').trim()
-  const parsed = JSON.parse(cleaned)
+
+  let parsed: Record<string, unknown> = {}
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch (err) {
+    console.error('[generatePredictedSettings] Failed to parse AI JSON response:', err, 'Raw:', raw)
+    return {}
+  }
 
   return {
     iso: typeof parsed.iso === 'number' ? parsed.iso : undefined,
@@ -202,6 +215,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const plannedAtDate = new Date(plannedAt)
   if (isNaN(plannedAtDate.getTime())) {
     return NextResponse.json({ error: 'plannedAt must be a valid ISO date string' }, { status: 400 })
+  }
+
+  if (!VALID_SCENE_TYPES.has(sceneType)) {
+    return NextResponse.json(
+      { error: `sceneType must be one of: ${[...VALID_SCENE_TYPES].join(', ')}` },
+      { status: 400 }
+    )
+  }
+
+  if (locationName != null && locationName.length > LOCATION_NAME_MAX_LENGTH) {
+    return NextResponse.json(
+      { error: `locationName must be at most ${LOCATION_NAME_MAX_LENGTH} characters` },
+      { status: 400 }
+    )
   }
 
   // Fetch user for OpenAI key
