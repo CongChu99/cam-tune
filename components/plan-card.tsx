@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import { MapPin, Clock, Trash2, CheckCircle, Bell, BellOff } from 'lucide-react'
+import { MapPin, Clock, Trash2, CheckCircle, Bell, BellOff, ClipboardEdit, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -37,13 +37,42 @@ export interface ShootPlan {
   updatedAt: string
 }
 
+interface ActualSettings {
+  iso?: string
+  aperture?: string
+  shutter?: string
+  wb?: string
+}
+
 interface PlanCardProps {
   plan: ShootPlan
   /** Whether user is currently near this plan's location (within 500m) */
   isNearby?: boolean
   onDelete?: (id: string) => void
-  onMarkComplete?: (id: string) => void
+  onMarkComplete?: (id: string, actualSettings?: ActualSettings) => void
   className?: string
+}
+
+// ─── Forecast snapshot parser ─────────────────────────────────────────────────
+
+interface ForecastEntry {
+  forecast?: Record<string, unknown>
+  actual?: Record<string, unknown>
+}
+
+function parseForecastSnapshot(raw: string | null | undefined): ForecastEntry {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    // If it has a `forecast` key, it's the new format { forecast: {...}, actual: {...} }
+    if (parsed && typeof parsed === 'object' && 'forecast' in parsed) {
+      return parsed as ForecastEntry
+    }
+    // Otherwise it's the old format (raw weather object) — treat as forecast
+    return { forecast: parsed }
+  } catch {
+    return {}
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,10 +102,15 @@ function isWithinHour(iso: string): boolean {
 export function PlanCard({ plan, isNearby, onDelete, onMarkComplete, className }: PlanCardProps) {
   const [deleting, setDeleting] = useState(false)
   const [completing, setCompleting] = useState(false)
+  const [showActualForm, setShowActualForm] = useState(false)
+  const [actualSettings, setActualSettings] = useState<ActualSettings>({})
+  const [savingActual, setSavingActual] = useState(false)
 
   const upcoming = isUpcoming(plan.plannedAt)
   const approachingSoon = isWithinHour(plan.plannedAt)
   const isCompleted = !!plan.completedAt
+
+  const forecastData = parseForecastSnapshot(plan.forecastSnapshot)
 
   async function handleDelete() {
     if (!onDelete) return
@@ -98,6 +132,17 @@ export function PlanCard({ plan, isNearby, onDelete, onMarkComplete, className }
     }
   }
 
+  async function handleSaveActualSettings() {
+    if (!onMarkComplete) return
+    setSavingActual(true)
+    try {
+      await onMarkComplete(plan.id, actualSettings)
+      setShowActualForm(false)
+    } finally {
+      setSavingActual(false)
+    }
+  }
+
   const hasPredictions =
     plan.predictedIso || plan.predictedAperture || plan.predictedShutter ||
     plan.predictedWB || plan.predictedMetering
@@ -114,11 +159,123 @@ export function PlanCard({ plan, isNearby, onDelete, onMarkComplete, className }
         className
       )}
     >
-      {/* ── Proximity alert ── */}
+      {/* ── Proximity alert + forecast vs actual comparison ── */}
       {isNearby && !isCompleted && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-400">
-          <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
-          <span className="font-medium">You&apos;re near your planned location!</span>
+        <div className="mb-3 space-y-3">
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-400">
+            <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="font-medium">You&apos;re near your planned location!</span>
+          </div>
+
+          {/* Forecast vs actual comparison section */}
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/40 dark:bg-blue-900/10">
+            <p className="mb-2 text-xs font-semibold text-blue-700 dark:text-blue-400">
+              Compare Forecast vs Current Conditions
+            </p>
+
+            {/* Forecast weather snapshot */}
+            {forecastData.forecast && (
+              <div className="mb-2 rounded-md border border-blue-100 bg-white/70 p-2 dark:border-blue-900/30 dark:bg-zinc-800/50">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                  Predicted at plan time
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                  {forecastData.forecast.cloudCoverPct !== undefined && (
+                    <span>Cloud cover: {String(forecastData.forecast.cloudCoverPct)}%</span>
+                  )}
+                  {forecastData.forecast.temperature !== undefined && (
+                    <span>Temp: {String(forecastData.forecast.temperature)}°C</span>
+                  )}
+                  {forecastData.forecast.uvIndex !== undefined && (
+                    <span>UV: {String(forecastData.forecast.uvIndex)}</span>
+                  )}
+                  {forecastData.forecast.visibilityKm !== undefined && (
+                    <span>Visibility: {String(forecastData.forecast.visibilityKm)}km</span>
+                  )}
+                  {forecastData.forecast.humidity !== undefined && (
+                    <span>Humidity: {String(forecastData.forecast.humidity)}%</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Actual settings already recorded */}
+            {forecastData.actual && (() => {
+              const a = forecastData.actual as Record<string, string | number | undefined>
+              return (
+                <div className="mb-2 rounded-md border border-emerald-100 bg-white/70 p-2 dark:border-emerald-900/30 dark:bg-zinc-800/50">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                    Actual settings used
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                    {a.iso && <span>ISO: {String(a.iso)}</span>}
+                    {a.aperture && <span>Aperture: f/{String(a.aperture)}</span>}
+                    {a.shutter && <span>Shutter: {String(a.shutter)}s</span>}
+                    {a.wb && <span>WB: {String(a.wb)}</span>}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Record actual settings button / form */}
+            {!showActualForm ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setShowActualForm(true)}
+                className="w-full gap-1.5 text-xs border-blue-200 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+              >
+                <ClipboardEdit className="size-3.5" aria-hidden="true" />
+                Record Actual Settings
+              </Button>
+            ) : (
+              <div className="rounded-md border border-blue-200 bg-white p-2 dark:border-blue-800 dark:bg-zinc-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Enter settings you used
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowActualForm(false)}
+                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    aria-label="Close form"
+                  >
+                    <X className="size-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'ISO', field: 'iso' as keyof ActualSettings, placeholder: 'e.g. 400' },
+                    { label: 'Aperture', field: 'aperture' as keyof ActualSettings, placeholder: 'e.g. 5.6' },
+                    { label: 'Shutter', field: 'shutter' as keyof ActualSettings, placeholder: 'e.g. 1/500' },
+                    { label: 'White Balance', field: 'wb' as keyof ActualSettings, placeholder: 'e.g. Daylight' },
+                  ].map(({ label, field, placeholder }) => (
+                    <div key={field} className="space-y-0.5">
+                      <label className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">{label}</label>
+                      <input
+                        type="text"
+                        value={actualSettings[field] ?? ''}
+                        onChange={(e) => setActualSettings((prev) => ({ ...prev, [field]: e.target.value }))}
+                        placeholder={placeholder}
+                        className="w-full rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-blue-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-700 dark:text-zinc-100"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveActualSettings}
+                  disabled={savingActual}
+                  className="w-full gap-1.5 text-xs"
+                >
+                  <CheckCircle className="size-3.5" aria-hidden="true" />
+                  {savingActual ? 'Saving…' : 'Save & Mark Complete'}
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

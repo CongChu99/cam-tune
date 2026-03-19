@@ -1,12 +1,13 @@
 'use client'
 
 /**
- * LocationMapPicker — A lat/lng picker with optional map preview.
+ * LocationMapPicker — A lat/lng picker with map preview.
  *
- * Since Leaflet requires SSR exclusion and CORS-safe tile loading, this
- * component provides two modes:
- * 1. Manual lat/lng input fields (always available)
+ * Provides:
+ * 1. Interactive OpenStreetMap embed (iframe) that shows a marker at the
+ *    selected coordinates and updates when coordinates change.
  * 2. "Use my current location" button (navigator.geolocation)
+ * 3. Manual lat/lng input fields for precise entry
  *
  * The parent receives coordinates via the `onChange` callback.
  */
@@ -123,6 +124,15 @@ export function LocationMapPicker({
     }
   }
 
+  // Derive the map src when we have valid coordinates
+  const lat = parseFloat(latInput)
+  const lng = parseFloat(lngInput)
+  const hasCoords = !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+  // OpenStreetMap export/embed URL — shows a marker pin at the given coordinates
+  const mapSrc = hasCoords
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.02},${lat - 0.015},${lng + 0.02},${lat + 0.015}&layer=mapnik&marker=${lat},${lng}`
+    : null
+
   return (
     <div className={cn('space-y-3', className)}>
       {/* Use current location button */}
@@ -147,6 +157,32 @@ export function LocationMapPicker({
         <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
           <MapPin className="size-3.5 shrink-0 text-zinc-400" aria-hidden="true" />
           <span className="truncate">{locationName}</span>
+        </div>
+      )}
+
+      {/* OpenStreetMap embed — updates whenever coordinates change */}
+      {mapSrc ? (
+        <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
+          <iframe
+            key={mapSrc}
+            src={mapSrc}
+            title="Map preview"
+            width="100%"
+            height="200"
+            loading="lazy"
+            style={{ border: 0 }}
+            aria-label={`Map showing location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`}
+          />
+          <p className="px-2 py-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+            Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap</a> contributors
+          </p>
+        </div>
+      ) : (
+        <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 text-xs text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800/50">
+          <div className="flex flex-col items-center gap-1.5">
+            <MapPin className="size-5 opacity-40" aria-hidden="true" />
+            <span>Enter coordinates or use GPS to see map</span>
+          </div>
         </div>
       )}
 

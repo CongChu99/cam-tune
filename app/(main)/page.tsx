@@ -14,7 +14,8 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Camera, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { Camera, RefreshCw, CalendarClock, History, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LocationContextBar } from '@/components/location-context-bar'
 import { ModeToggle } from '@/components/mode-toggle'
@@ -388,7 +389,52 @@ export default function MainPage() {
             ))}
           </section>
         )}
+
+        {/* Spacer to prevent content going behind bottom nav */}
+        <div className="h-16" aria-hidden="true" />
       </main>
+
+      {/* ── Bottom navigation ── */}
+      <nav
+        aria-label="Main navigation"
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90"
+      >
+        <div className="mx-auto flex max-w-lg items-center justify-around px-4 py-2">
+          <Link
+            href="/"
+            className="flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-blue-600 dark:text-blue-400"
+            aria-label="Camera — current page"
+            aria-current="page"
+          >
+            <Camera className="size-5" aria-hidden="true" />
+            <span className="text-[10px] font-medium">Camera</span>
+          </Link>
+          <Link
+            href="/plan"
+            className="flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            aria-label="Shoot Plans"
+          >
+            <CalendarClock className="size-5" aria-hidden="true" />
+            <span className="text-[10px] font-medium">Plans</span>
+          </Link>
+          <Link
+            href="/history"
+            className="flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            aria-label="Session History"
+          >
+            <History className="size-5" aria-hidden="true" />
+            <span className="text-[10px] font-medium">History</span>
+          </Link>
+          <Link
+            href="/settings"
+            className="flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            aria-label="Settings"
+          >
+            <Settings className="size-5" aria-hidden="true" />
+            <span className="text-[10px] font-medium">Settings</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   )
 }

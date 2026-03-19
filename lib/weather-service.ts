@@ -136,6 +136,78 @@ function buildSunData(lat: number, lng: number, now: Date): SunData {
   }
 }
 
+// ─── Open-Meteo Hourly Forecast ───────────────────────────────────────────────
+
+/**
+ * Fetches hourly forecast from Open-Meteo for the given coordinates and returns
+ * weather data for the specific hour matching `targetDate`. Falls back to the
+ * closest available hour if exact match is not found.
+ *
+ * Supports up to 16 days in the future.
+ */
+export async function getWeatherForecast(
+  lat: number,
+  lng: number,
+  targetDate: Date
+): Promise<WeatherData> {
+  const url =
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${lat}&longitude=${lng}` +
+    `&hourly=temperature_2m,precipitation,wind_speed_10m,cloud_cover,relative_humidity_2m,uv_index,visibility` +
+    `&daily=sunrise,sunset` +
+    `&forecast_days=16` +
+    `&timezone=auto`
+
+  const res = await fetch(url, { next: { revalidate: 0 } })
+  if (!res.ok) {
+    throw new Error(`Open-Meteo forecast request failed: ${res.status}`)
+  }
+
+  const data = await res.json()
+  const hourly = data.hourly
+  const daily = data.daily
+
+  // Find the hourly index closest to targetDate
+  const targetMs = targetDate.getTime()
+  const times: string[] = hourly.time ?? []
+  let bestIdx = 0
+  let bestDiff = Infinity
+
+  for (let i = 0; i < times.length; i++) {
+    const diff = Math.abs(new Date(times[i]).getTime() - targetMs)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      bestIdx = i
+    }
+  }
+
+  // Find the daily index for sunrise/sunset
+  const targetDateStr = targetDate.toISOString().slice(0, 10)
+  const dailyTimes: string[] = daily.time ?? []
+  const dailyIdx = dailyTimes.findIndex((t) => t === targetDateStr)
+  const sunriseStr = dailyIdx >= 0 ? (daily.sunrise?.[dailyIdx] ?? '') : (daily.sunrise?.[0] ?? '')
+  const sunsetStr = dailyIdx >= 0 ? (daily.sunset?.[dailyIdx] ?? '') : (daily.sunset?.[0] ?? '')
+
+  const times2 = SunCalc.getTimes(targetDate, lat, lng)
+  const goldenHourStart = times2.goldenHour
+  const goldenHourEnd = times2.sunsetStart
+
+  const visibilityRaw = hourly.visibility?.[bestIdx] ?? 0
+  const visibilityKm = Math.round((visibilityRaw / 1000) * 10) / 10
+
+  return {
+    cloudCoverPct: hourly.cloud_cover?.[bestIdx] ?? 0,
+    uvIndex: hourly.uv_index?.[bestIdx] ?? 0,
+    visibilityKm,
+    temperature: hourly.temperature_2m?.[bestIdx] ?? 0,
+    humidity: hourly.relative_humidity_2m?.[bestIdx] ?? 0,
+    sunrise: sunriseStr,
+    sunset: sunsetStr,
+    goldenHourStart: goldenHourStart.toISOString(),
+    goldenHourEnd: goldenHourEnd.toISOString(),
+  }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**

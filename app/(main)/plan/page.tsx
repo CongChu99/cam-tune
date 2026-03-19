@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, X, CalendarClock, Loader2 } from 'lucide-react'
+import { Plus, X, CalendarClock, Loader2, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlanCard, type ShootPlan } from '@/components/plan-card'
 import { LocationMapPicker, type LatLng } from '@/components/location-map-picker'
@@ -96,6 +96,8 @@ export default function PlanPage() {
   // GPS state for proximity detection
   const [userCoords, setUserCoords] = useState<LatLng | null>(null)
   const notifiedRef = useRef<Set<string>>(new Set())
+  // In-app notification fallback state
+  const [upcomingAlert, setUpcomingAlert] = useState<string | null>(null)
 
   // ── Fetch plans ────────────────────────────────────────────────────────────
 
@@ -118,6 +120,16 @@ export default function PlanPage() {
   useEffect(() => {
     fetchPlans()
   }, [fetchPlans])
+
+  // ── Request browser notification permission on mount ───────────────────────
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {/* non-fatal */})
+      }
+    }
+  }, [])
 
   // ── GPS watching for proximity detection ───────────────────────────────────
 
@@ -146,6 +158,20 @@ export default function PlanPage() {
         // Within 1 hour and not yet notified in this session
         if (diff > 0 && diff <= 60 * 60 * 1000 && !notifiedRef.current.has(plan.id)) {
           notifiedRef.current.add(plan.id)
+
+          // Show browser notification if permission granted, else use in-app fallback
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('Shoot time in 1 hour!', {
+                body: plan.title,
+                icon: '/favicon.ico',
+              })
+            } catch {/* non-fatal */}
+          } else {
+            // In-app fallback alert
+            setUpcomingAlert(`Reminder: "${plan.title}" is within 1 hour!`)
+          }
+
           // Fire the notify endpoint
           try {
             await fetch(`/api/plans/${plan.id}/notify`, { method: 'POST' })
@@ -238,11 +264,31 @@ export default function PlanPage() {
     }
   }
 
-  async function handleMarkComplete(id: string) {
+  async function handleMarkComplete(id: string, actualSettings?: { iso?: string; aperture?: string; shutter?: string; wb?: string }) {
+    // If actual settings were provided, merge them into the forecastSnapshot alongside the existing forecast data
+    const plan = plans.find((p) => p.id === id)
+    let forecastSnapshotUpdate: string | undefined
+
+    if (actualSettings && plan) {
+      try {
+        const existing = plan.forecastSnapshot ? JSON.parse(plan.forecastSnapshot) : {}
+        // Preserve existing forecast data, add actual settings
+        const forecast = existing.forecast ?? (existing.cloudCoverPct !== undefined ? existing : undefined)
+        forecastSnapshotUpdate = JSON.stringify({ forecast, actual: actualSettings })
+      } catch {
+        forecastSnapshotUpdate = JSON.stringify({ actual: actualSettings })
+      }
+    }
+
+    const body: Record<string, unknown> = { completedAt: new Date().toISOString() }
+    if (forecastSnapshotUpdate !== undefined) {
+      body.forecastSnapshot = forecastSnapshotUpdate
+    }
+
     const res = await fetch(`/api/plans/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ completedAt: new Date().toISOString() }),
+      body: JSON.stringify(body),
     })
     if (res.ok) {
       const data = await res.json()
@@ -288,6 +334,25 @@ export default function PlanPage() {
       </header>
 
       <main className="mx-auto w-full max-w-lg flex-1 space-y-4 px-4 py-4">
+        {/* ── In-app notification fallback (shown when browser notifications denied) ── */}
+        {upcomingAlert && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-400"
+          >
+            <span>{upcomingAlert}</span>
+            <button
+              type="button"
+              onClick={() => setUpcomingAlert(null)}
+              className="shrink-0 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300"
+              aria-label="Dismiss reminder"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+
         {/* ── Create form ── */}
         {showForm && (
           <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-800/50 dark:bg-zinc-900">

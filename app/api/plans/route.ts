@@ -20,7 +20,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { getLocationContext } from '@/lib/weather-service'
+import { getLocationContext, getWeatherForecast } from '@/lib/weather-service'
 import { getSunPosition } from '@/lib/suncalc-wrapper'
 import { decryptApiKey, createClient } from '@/lib/openai-client'
 
@@ -57,14 +57,27 @@ async function generatePredictedSettings(
   metering?: string
   forecastSnapshot?: string
 }> {
-  // Fetch weather / location context (uses current conditions as a proxy)
+  // Fetch weather forecast for the planned shoot date, plus location name
   let weather: Awaited<ReturnType<typeof getLocationContext>>['weather'] | null = null
   let locationName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
 
   try {
-    const ctx = await getLocationContext(latitude, longitude)
-    weather = ctx.weather
-    locationName = ctx.locationName
+    // Use hourly forecast endpoint for the specific planned date/time
+    // (supports up to 16 days out). Fall back to current conditions if forecast fails.
+    const [forecastWeather, ctx] = await Promise.allSettled([
+      getWeatherForecast(latitude, longitude, plannedAt),
+      getLocationContext(latitude, longitude),
+    ])
+
+    if (forecastWeather.status === 'fulfilled') {
+      weather = forecastWeather.value
+    } else if (ctx.status === 'fulfilled') {
+      weather = ctx.value.weather
+    }
+
+    if (ctx.status === 'fulfilled') {
+      locationName = ctx.value.locationName
+    }
   } catch {
     // Non-fatal — proceed without weather data
   }
