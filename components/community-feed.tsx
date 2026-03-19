@@ -83,11 +83,19 @@ export function CommunityFeed({ currentUserId }: CommunityFeedProps) {
     [locationEnabled, userLat, userLng]
   )
 
-  // Initial load and when filters change
+  // Initial load and when location filters change
   useEffect(() => {
     fetchCards(1, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationEnabled, userLat, userLng])
+
+  // Refetch when cameraFilter is cleared
+  useEffect(() => {
+    if (cameraFilter === '') {
+      fetchCards(1, false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraFilter])
 
   // ── GPS ──────────────────────────────────────────────────────────────────────
 
@@ -184,7 +192,7 @@ export function CommunityFeed({ currentUserId }: CommunityFeedProps) {
 
   const clearCameraFilter = () => {
     setCameraFilter('')
-    setTimeout(() => fetchCards(1, false), 0)
+    // fetchCards will be triggered by the useEffect watching cameraFilter === ''
   }
 
   const hasMore = cards.length < total

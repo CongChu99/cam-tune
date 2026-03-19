@@ -26,15 +26,19 @@ export async function POST(
     // reason is optional — ignore parse errors
   }
 
+  if (reason !== undefined && reason.length > 500) {
+    return NextResponse.json({ error: 'reason must be 500 characters or fewer' }, { status: 400 })
+  }
+
   try {
     const result = await reportCard(cardId, userId, reason)
     return NextResponse.json(result)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to report card'
+    const message = err instanceof Error ? err.message : ''
     if (message === 'Card not found') {
-      return NextResponse.json({ error: message }, { status: 404 })
+      return NextResponse.json({ error: 'Card not found' }, { status: 404 })
     }
     console.error('[POST /api/community/cards/:id/report]', err)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 })
   }
 }
