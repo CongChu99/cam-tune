@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "currentState": "CODE",
+  "currentState": "CODE_LOOP",
   "feature": {
     "name": "CamTune — AI Camera Settings Advisor",
     "slug": "cam-tune-ai-advisor",
@@ -8,11 +8,29 @@
   },
   "mode": "research",
   "startedAt": "2026-03-18",
-  "completedStates": ["RESEARCH", "SPEC", "BEADS"],
+  "completedStates": [
+    "RESEARCH",
+    "SPEC",
+    "BEADS"
+  ],
   "failedAttempts": 0,
   "beadsEpic": "cam-tune-20a",
   "doltRemote": null,
   "worktree": null,
   "prNumber": null,
-  "lastError": null
+  "lastError": null,
+  "taskLoop": {
+    "currentTaskId": "cam-tune-17s",
+    "currentTaskSlug": "capture-one-integration",
+    "currentBranch": "feat/cam-tune-17s-capture-one-integration",
+    "subState": "REVIEWING",
+    "completedTasks": [
+      {
+        "id": "cam-tune-3wr",
+        "pr": null,
+        "mergedAt": "2026-03-19T00:00:00Z"
+      }
+    ],
+    "failedTasks": []
+  }
 }

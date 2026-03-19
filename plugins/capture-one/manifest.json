@@ -1,0 +1,45 @@
+{
+  "id": "com.camtune.captureone",
+  "name": "CamTune",
+  "version": "1.0.0",
+  "description": "Sync CamTune shoot session metadata — GPS, weather, AI recommendations, and actual settings — into your Capture One catalog.",
+  "author": "CamTune",
+  "authorUrl": "https://camtune.app",
+  "minCaptureOneVersion": "22.0.0",
+  "apiVersion": "1.0",
+  "entryPoint": "index.js",
+  "permissions": [
+    "catalog.read",
+    "catalog.write",
+    "metadata.write",
+    "network"
+  ],
+  "menu": [
+    {
+      "id": "camtune.sync",
+      "label": "Sync with CamTune",
+      "script": "index.js",
+      "action": "syncSession"
+    },
+    {
+      "id": "camtune.connect",
+      "label": "Connect CamTune Account",
+      "script": "index.js",
+      "action": "connectAccount"
+    },
+    {
+      "id": "camtune.disconnect",
+      "label": "Disconnect CamTune",
+      "script": "index.js",
+      "action": "disconnectAccount"
+    }
+  ],
+  "panels": [
+    {
+      "id": "camtune.sessionPanel",
+      "label": "CamTune Session Info",
+      "script": "index.js",
+      "action": "renderSessionPanel"
+    }
+  ]
+}

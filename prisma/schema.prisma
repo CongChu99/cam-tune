@@ -49,6 +49,10 @@ model User {
   lightroomRefreshTokenEncrypted  String?
   lightroomTokenExpiry            DateTime?
   lightroomTokenIssuedAt          DateTime?
+  captureOneAccessTokenEncrypted  String?
+  captureOneRefreshTokenEncrypted String?
+  captureOneTokenExpiry           DateTime?
+  captureOneTokenIssuedAt         DateTime?
   createdAt                       DateTime   @default(now())
 
   cameraProfiles CameraProfile[]
@@ -137,6 +141,8 @@ model ShootSession {
   aiRecommendation Json?
   /// Actual settings used (filled in after shoot)
   actualSettings   Json?
+  /// Capture One offline sync queue — stores {pending: string[]} of session IDs awaiting retry
+  captureOneSyncQueue Json?
   /// Rating 1–5 (CHECK constraint enforced at app layer; SQLite has no CHECK via Prisma)
   userRating       Int?
   notes            String?

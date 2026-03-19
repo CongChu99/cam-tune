@@ -12,7 +12,9 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { LightroomService, isAdobeConfigured } from "@/lib/lightroom-service";
+import { CaptureOneService, isCaptureOneConfigured } from "@/lib/captureone-service";
 import LightroomIntegrationCard from "./LightroomIntegrationCard";
+import CaptureOneIntegrationCard from "./CaptureOneIntegrationCard";
 
 export const metadata = {
   title: "Integrations — CamTune",
@@ -33,7 +35,12 @@ export default async function IntegrationsPage({
   const justConnected = params.connected === "1";
   const oauthError = params.error;
 
-  const status = await LightroomService.getStatus(session.user.id);
+  const [lrStatus, c1Status] = await Promise.all([
+    LightroomService.getStatus(session.user.id),
+    isCaptureOneConfigured()
+      ? CaptureOneService.getStatus(session.user.id)
+      : Promise.resolve({ configured: false, connected: false, needsReauth: false }),
+  ]);
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-10">
@@ -65,7 +72,11 @@ export default async function IntegrationsPage({
       )}
 
       <div className="space-y-4">
-        <LightroomIntegrationCard status={status} />
+        <LightroomIntegrationCard status={lrStatus} />
+        <CaptureOneIntegrationCard
+          status={c1Status}
+          pluginConfigured={isCaptureOneConfigured()}
+        />
       </div>
     </main>
   );
