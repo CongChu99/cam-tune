@@ -1,5 +1,22 @@
 import SunCalc from 'suncalc'
 import { getSunPosition } from './suncalc-wrapper'
+import https from 'node:https'
+
+/** HTTP GET using node:https — bypasses Next.js fetch instrumentation */
+function httpsGet(url: string, headers?: Record<string, string>): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers }, (res) => {
+      let raw = ''
+      res.on('data', (chunk: Buffer) => { raw += chunk.toString() })
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)) }
+        catch (e) { reject(e) }
+      })
+    })
+    req.setTimeout(5000, () => { req.destroy(); reject(new Error('timeout')) })
+    req.on('error', reject)
+  })
+}
 
 export interface WeatherData {
   cloudCoverPct: number
@@ -36,12 +53,7 @@ async function fetchWeather(lat: number, lng: number): Promise<WeatherData> {
     `&daily=sunrise,sunset` +
     `&timezone=auto`
 
-  const res = await fetch(url, { next: { revalidate: 0 } })
-  if (!res.ok) {
-    throw new Error(`Open-Meteo request failed: ${res.status}`)
-  }
-
-  const data = await res.json()
+  const data = await httpsGet(url) as { current: Record<string, number>; daily: Record<string, string[]> }
   const current = data.current
   const daily = data.daily
 
@@ -75,20 +87,16 @@ async function fetchWeather(lat: number, lng: number): Promise<WeatherData> {
 async function fetchLocationName(lat: number, lng: number): Promise<string> {
   const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
 
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'CamTune/1.0' },
-    next: { revalidate: 0 },
-  })
-
-  if (!res.ok) {
+  let data: Record<string, unknown>
+  try {
+    data = await httpsGet(url, { 'User-Agent': 'CamTune/1.0' }) as Record<string, unknown>
+  } catch {
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`
   }
 
-  const data = await res.json()
-
   // Build a human-readable name: prefer named amenity/quarter + city, else
   // fall back to the display_name
-  const addr = data.address ?? {}
+  const addr = (data.address ?? {}) as Record<string, string>
   const parts: string[] = []
 
   const landmark =
@@ -158,12 +166,7 @@ export async function getWeatherForecast(
     `&forecast_days=16` +
     `&timezone=auto`
 
-  const res = await fetch(url, { next: { revalidate: 0 } })
-  if (!res.ok) {
-    throw new Error(`Open-Meteo forecast request failed: ${res.status}`)
-  }
-
-  const data = await res.json()
+  const data = await httpsGet(url) as { hourly: Record<string, unknown[]>; daily: Record<string, string[]> }
   const hourly = data.hourly
   const daily = data.daily
 

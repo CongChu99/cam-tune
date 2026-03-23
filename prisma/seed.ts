@@ -1,31 +1,13 @@
 import * as dotenv from "dotenv";
-import * as path from "path";
-import * as nodeUrl from "url";
 
 // Load local env first (overrides .env for local dev)
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
-import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaClient } from "../lib/generated/prisma";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const dbUrl = process.env.DATABASE_URL ?? "file:./dev.db";
-
-// libsql requires absolute file:// URLs.
-// Convert "file:./dev.db" or "file:dev.db" → "file:///absolute/path/dev.db"
-function toAbsoluteLibsqlUrl(rawUrl: string): string {
-  if (rawUrl.startsWith("file:")) {
-    const filePart = rawUrl.slice(5); // strip "file:"
-    const absPath = path.resolve(process.cwd(), filePart);
-    return nodeUrl.pathToFileURL(absPath).href;
-  }
-  return rawUrl;
-}
-
-const libsqlUrl = toAbsoluteLibsqlUrl(dbUrl);
-
-// In Prisma v7, PrismaLibSql takes the config object directly (url + authToken)
-const adapter = new PrismaLibSql({ url: libsqlUrl });
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 const cameras = [

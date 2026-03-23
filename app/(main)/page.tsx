@@ -1,19 +1,9 @@
 'use client'
 
-/**
- * Main recommendation page (app/(main)/page.tsx)
- *
- * - Camera feed capture via getUserMedia → canvas → base64 JPEG
- * - "Get Recommendation" button triggers POST /api/recommend
- * - Displays 3 RecommendationCards (with shutterSpeedWarning from top suggestion)
- * - Shows LocationContextBar (Task 5)
- * - Loading + error states
- * - First-time tooltip: "You're in Learning Mode — switch to Quick for faster workflow"
- * - Active camera name in header
- * - ModeToggle always visible in header
- */
-
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
+import { useSession, signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Camera, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LocationContextBar } from '@/components/location-context-bar'
@@ -30,16 +20,32 @@ interface CameraProfile {
   isActive: boolean
 }
 
+interface WeatherSnapshot {
+  cloudCoverPct: number
+  uvIndex: number
+  visibilityKm: number
+  temperature: number
+  humidity: number
+  sunrise?: string
+  sunset?: string
+  goldenHourStart?: string
+  goldenHourEnd?: string
+}
+
+interface SceneAnalysis {
+  sceneType: string
+  estimatedEV: number
+  subjectMotion: string
+  depthIntent: string
+}
+
 interface RecommendResponse {
   suggestions: Suggestion[]
   shutterSpeedWarning?: string
-  sceneAnalysis?: {
-    sceneType: string
-    estimatedEV: number
-    subjectMotion: string
-    depthIntent: string
-  }
+  sceneAnalysis?: SceneAnalysis
+  weatherSnapshot?: WeatherSnapshot
   modelUsed?: string
+  recommendationId?: string
 }
 
 // localStorage key to track first-time tooltip display
@@ -76,14 +82,9 @@ function Spinner() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function MainPage() {
+  const { status } = useSession()
+  const router = useRouter()
   const { mode } = useUIMode()
-
-  // ── Camera feed ──────────────────────────────────────────────────────────
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const [stream, setStream] = useState<MediaStream | null>(null)
-  const [cameraError, setCameraError] = useState<string | null>(null)
 
   // ── Active camera profile ────────────────────────────────────────────────
   const [activeCamera, setActiveCamera] = useState<CameraProfile | null>(null)
@@ -98,6 +99,9 @@ export default function MainPage() {
 
   // ── First-time tooltip ───────────────────────────────────────────────────
   const [showTooltip, setShowTooltip] = useState(false)
+
+  // router kept for potential future use
+  void router
 
   // ─── Init: tooltip, camera profiles, geolocation ─────────────────────────
 
@@ -142,60 +146,6 @@ export default function MainPage() {
     )
   }, [])
 
-  // ─── Camera feed ──────────────────────────────────────────────────────────
-
-  const startCamera = useCallback(async () => {
-    setCameraError(null)
-    try {
-      // Stop existing stream before starting a new one
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-
-      const s = await navigator.mediaDevices.getUserMedia({ video: true })
-      setStream(s)
-      streamRef.current = s
-      if (videoRef.current) {
-        videoRef.current.srcObject = s
-        videoRef.current.play()
-      }
-    } catch {
-      setCameraError('Camera access denied or unavailable.')
-    }
-  }, [])
-
-  useEffect(() => {
-    startCamera()
-    return () => {
-      // Cleanup stream on unmount using ref to avoid dependency issues
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Attach stream to video element once both are available
-  useEffect(() => {
-    if (stream && videoRef.current && !videoRef.current.srcObject) {
-      videoRef.current.srcObject = stream
-      videoRef.current.play()
-    }
-  }, [stream])
-
-  /** Capture a frame from the video feed and return base64 JPEG (no prefix) */
-  function captureFrame(): string | null {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas) return null
-
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    // Strip the data URL prefix to get raw base64
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
-    return dataUrl.replace(/^data:image\/jpeg;base64,/, '')
-  }
-
   // ─── Get recommendation ───────────────────────────────────────────────────
 
   async function handleGetRecommendation() {
@@ -212,12 +162,6 @@ export default function MainPage() {
       return
     }
 
-    const sceneFrame = captureFrame()
-    if (!sceneFrame) {
-      setError('Unable to capture camera frame. Please allow camera access.')
-      return
-    }
-
     setLoading(true)
     try {
       const modeParam = mode === 'quick' ? '?mode=quick' : ''
@@ -226,11 +170,10 @@ export default function MainPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cameraProfileId: activeCamera.id,
-          sceneFrame,
           lat: coords.lat,
           lng: coords.lng,
         }),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(180_000),
       })
 
       if (!res.ok) {
@@ -251,24 +194,55 @@ export default function MainPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  if (status === 'loading') return null
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950">
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/80 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/80">
         <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
-          <div className="flex flex-col">
-            <h1 className="text-base font-bold leading-tight text-zinc-900 dark:text-zinc-100">
-              CamTune
-            </h1>
-            {activeCamera && (
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {activeCamera.brand} {activeCamera.model}
-              </span>
-            )}
+          <div className="flex items-center gap-2">
+            <div className="flex flex-col">
+              <h1 className="text-base font-bold leading-tight text-zinc-900 dark:text-zinc-100">
+                CamTune
+              </h1>
+              {activeCamera ? (
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {activeCamera.brand} {activeCamera.model}
+                </span>
+              ) : (
+                <span className="text-xs text-red-400">Chưa có camera</span>
+              )}
+            </div>
+            <Link
+              href="/cameras"
+              className="rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              title="Quản lý camera"
+            >
+              + Camera
+            </Link>
           </div>
 
-          {/* Mode toggle — always visible */}
-          <ModeToggle />
+          {/* Right side: mode toggle + auth */}
+          <div className="flex items-center gap-2">
+            <ModeToggle />
+            {status === 'authenticated' ? (
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              >
+                Đăng xuất
+              </button>
+            ) : (
+              <Link
+                href="/auth/signin"
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+              >
+                Đăng nhập
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -298,35 +272,6 @@ export default function MainPage() {
       <main className="mx-auto w-full max-w-lg flex-1 space-y-4 px-4 py-4">
         {/* Location context */}
         <LocationContextBar />
-
-        {/* Camera feed */}
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-black dark:border-zinc-700">
-          {cameraError ? (
-            <div className="flex h-48 flex-col items-center justify-center gap-2 text-zinc-400">
-              <Camera className="size-10 opacity-40" aria-hidden="true" />
-              <p className="text-sm">{cameraError}</p>
-              <button
-                type="button"
-                onClick={startCamera}
-                className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs text-white hover:bg-zinc-600"
-              >
-                Retry camera
-              </button>
-            </div>
-          ) : (
-            // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="h-48 w-full object-cover sm:h-56"
-              aria-label="Live camera feed"
-            />
-          )}
-          {/* Hidden canvas for frame capture */}
-          <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
-        </div>
 
         {/* Get Recommendation button */}
         <Button
@@ -369,24 +314,107 @@ export default function MainPage() {
 
         {/* Recommendation results */}
         {result && !loading && (
-          <section aria-label="Camera setting recommendations" className="space-y-3">
-            <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-              Recommendations
-            </h2>
-            {result.suggestions.map((suggestion, i) => (
-              <RecommendationCard
-                key={i}
-                suggestion={suggestion}
-                index={i}
-                shutterSpeedWarning={i === 0 ? (result.shutterSpeedWarning ?? null) : null}
-                cameraName={
-                  activeCamera
-                    ? `${activeCamera.brand} ${activeCamera.model}`
-                    : undefined
-                }
-              />
-            ))}
-          </section>
+          <div className="space-y-4">
+            {/* Scene analysis */}
+            {result.sceneAnalysis && (
+              <section aria-label="Scene analysis" className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                  Scene Analysis
+                </h2>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">Scene Type</p>
+                    <p className="text-sm font-semibold capitalize text-zinc-900 dark:text-zinc-100">{result.sceneAnalysis.sceneType}</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">Est. EV</p>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{result.sceneAnalysis.estimatedEV} EV</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">Subject Motion</p>
+                    <p className="text-sm font-semibold capitalize text-zinc-900 dark:text-zinc-100">{result.sceneAnalysis.subjectMotion}</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">Depth Intent</p>
+                    <p className="text-sm font-semibold capitalize text-zinc-900 dark:text-zinc-100">{result.sceneAnalysis.depthIntent}</p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Weather snapshot */}
+            {result.weatherSnapshot && (
+              <section aria-label="Weather conditions" className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                  Conditions
+                </h2>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">Clouds</p>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{result.weatherSnapshot.cloudCoverPct}%</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">UV Index</p>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{result.weatherSnapshot.uvIndex}</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">Visibility</p>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{result.weatherSnapshot.visibilityKm} km</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">Temp</p>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{result.weatherSnapshot.temperature}°C</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                    <p className="text-xs text-zinc-400">Humidity</p>
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{result.weatherSnapshot.humidity}%</p>
+                  </div>
+                  {result.weatherSnapshot.sunrise && (
+                    <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                      <p className="text-xs text-zinc-400">Sunrise</p>
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{result.weatherSnapshot.sunrise}</p>
+                    </div>
+                  )}
+                  {result.weatherSnapshot.sunset && (
+                    <div className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800">
+                      <p className="text-xs text-zinc-400">Sunset</p>
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{result.weatherSnapshot.sunset}</p>
+                    </div>
+                  )}
+                  {result.weatherSnapshot.goldenHourStart && (
+                    <div className="col-span-2 rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-900/20">
+                      <p className="text-xs text-amber-500">Golden Hour</p>
+                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                        {result.weatherSnapshot.goldenHourStart} – {result.weatherSnapshot.goldenHourEnd}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Suggestions */}
+            <section aria-label="Camera setting recommendations" className="space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                Recommendations
+              </h2>
+              {result.suggestions.map((suggestion, i) => (
+                <RecommendationCard
+                  key={i}
+                  suggestion={suggestion}
+                  index={i}
+                  shutterSpeedWarning={i === 0 ? (result.shutterSpeedWarning ?? null) : null}
+                  cameraName={activeCamera ? `${activeCamera.brand} ${activeCamera.model}` : undefined}
+                />
+              ))}
+            </section>
+
+            {/* Footer meta */}
+            <p className="text-center text-xs text-zinc-400 dark:text-zinc-600">
+              Model: {result.modelUsed ?? '—'}
+              {result.recommendationId && <> · ID: {result.recommendationId.slice(0, 8)}</>}
+            </p>
+          </div>
         )}
 
         {/* Spacer to prevent content going behind bottom nav */}

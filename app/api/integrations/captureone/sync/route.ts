@@ -35,15 +35,12 @@ const RATE_LIMIT_WINDOW_SECONDS = 60;
 const RATE_LIMIT_MAX_ATTEMPTS = 10;
 
 async function checkRateLimit(userId: string): Promise<boolean> {
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (!process.env.REDIS_URL) {
     return true; // Redis not configured — skip rate limiting
   }
   try {
-    const { Redis } = await import("@upstash/redis");
-    const redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
+    const { default: Redis } = await import("ioredis");
+    const redis = new Redis(process.env.REDIS_URL).on('error', () => {});
     const key = `c1:rl:${userId}`;
     const count = await redis.incr(key);
     if (count === 1) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Redis } from '@upstash/redis'
-import { getLocationContext } from '@/lib/weather-service'
+import Redis from 'ioredis'
+import { getLocationContext, type WeatherData, type SunData } from '@/lib/weather-service'
+import SunCalc from 'suncalc'
 
 // ─── Redis client (lazy singleton) ──────────────────────────────────────────
 // Credentials are expected in UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN
@@ -8,14 +9,11 @@ import { getLocationContext } from '@/lib/weather-service'
 let redis: Redis | null = null
 
 function getRedis(): Redis | null {
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (!process.env.REDIS_URL) {
     return null
   }
   if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    })
+    redis = new Redis(process.env.REDIS_URL).on('error', () => {})
   }
   return redis
 }
@@ -93,7 +91,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // ── Try cache first ──────────────────────────────────────────────────────
   if (client) {
     try {
-      const cached = await client.get<CachedPayload>(key)
+      const raw = await client.get(key)
+      const cached: CachedPayload | null = raw ? JSON.parse(raw) : null
       if (cached) {
         const cachedAtMs = new Date(cached.cachedAt).getTime()
         const isStale = Date.now() - cachedAtMs > STALE_THRESHOLD_MS
@@ -113,17 +112,47 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       cachedAt: new Date().toISOString(),
     }
 
-    // Store in Redis (fire and forget — errors don't block the response)
     if (client) {
-      client.set(key, payload, { ex: CACHE_TTL_SECONDS }).catch(() => {})
+      client.set(key, JSON.stringify(payload), 'EX', CACHE_TTL_SECONDS).catch(() => {})
     }
 
     return NextResponse.json({ ...payload, isStale: false })
   } catch (err) {
-    console.error('[/api/location] Failed to fetch location context:', err)
-    return NextResponse.json(
-      { error: 'Failed to retrieve location data. Please try again later.' },
-      { status: 503 }
-    )
+    console.warn('[/api/location] Weather fetch failed, returning local fallback:', err instanceof Error ? err.message : err)
+
+    // Compute sun data locally (no network needed)
+    const now = new Date()
+    const times = SunCalc.getTimes(now, lat, lng)
+    const pos = SunCalc.getPosition(now, lat, lng)
+    const altitudeDeg = (pos.altitude * 180) / Math.PI
+    const azimuthDeg = ((pos.azimuth * 180) / Math.PI + 180) % 360
+    const goldenStart = times.goldenHour.getTime()
+    const goldenEnd = times.sunsetStart.getTime()
+    const nowMs = now.getTime()
+
+    const sun: SunData = {
+      altitude: Math.round(altitudeDeg * 10) / 10,
+      azimuth: Math.round(azimuthDeg * 10) / 10,
+      isGoldenHour: nowMs >= goldenStart && nowMs <= goldenEnd,
+      minutesToGoldenHour: nowMs < goldenStart ? Math.round((goldenStart - nowMs) / 60_000) : 0,
+    }
+
+    const weather: WeatherData = {
+      cloudCoverPct: 0, uvIndex: 0, visibilityKm: 10,
+      temperature: 25, humidity: 60,
+      sunrise: times.sunrise.toISOString(),
+      sunset: times.sunset.toISOString(),
+      goldenHourStart: times.goldenHour.toISOString(),
+      goldenHourEnd: times.sunsetStart.toISOString(),
+    }
+
+    const fallback: CachedPayload = {
+      locationName: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+      weather,
+      sun,
+      cachedAt: now.toISOString(),
+    }
+
+    return NextResponse.json({ ...fallback, isStale: true })
   }
 }

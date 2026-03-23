@@ -28,8 +28,8 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@upstash/redis", () => ({
-  Redis: vi.fn().mockImplementation(() => ({
+vi.mock("ioredis", () => ({
+  default: vi.fn().mockImplementation(() => ({
     rpush: vi.fn().mockResolvedValue(1),
     lpop: vi.fn().mockResolvedValue(null),
     lrange: vi.fn().mockResolvedValue([]),
@@ -262,8 +262,7 @@ describe("Offline queue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Clear Redis env to force fallback to ShootSession.jsonb queue
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    delete process.env.REDIS_URL;
   });
 
   it("queueFailedSync() stores sessionId in ShootSession jsonb when Redis is unavailable", async () => {

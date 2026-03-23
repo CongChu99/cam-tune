@@ -1,7 +1,6 @@
 // CamTune — AI Camera Settings Advisor
 // Full schema for all models.
-// Local dev uses SQLite (file:./dev.db); production uses PostgreSQL via Supabase.
-// DB URL is provided via prisma.config.ts (reads DATABASE_URL from env).
+// Uses PostgreSQL (Supabase). DB URL is provided via DATABASE_URL env variable.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,11 +8,10 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
-// SQLite does not have native enums — Prisma maps these to String columns.
 
 enum SensorSize {
   FULL_FRAME
@@ -41,6 +39,8 @@ enum SkillLevel {
 model User {
   id                              String     @id @default(uuid())
   email                           String     @unique
+  name                            String?
+  passwordHash                    String?
   skillLevel                      SkillLevel @default(BEGINNER)
   uiMode                          UiMode     @default(BEGINNER)
   openaiApiKeyEncrypted           String?
@@ -78,7 +78,6 @@ model CameraDatabase {
   ibisStops           Decimal?
   dualNativeIso       Boolean    @default(false)
   /// Comma-separated ISO values for dual native ISO (e.g. "800,12800").
-  /// SQLite dev: String. Production (PostgreSQL) would use Int[].
   dualNativeIsoValues String?
   dynamicRangeEv      Decimal?
   releaseYear         Int?
@@ -107,7 +106,6 @@ model CameraProfile {
   shootSessions  ShootSession[]
 
   /// Only one active profile per user — enforced at application layer.
-  /// (SQLite partial indexes are not supported in Prisma migrations; enforce in app code.)
   @@index([userId, isActive])
 }
 
@@ -143,7 +141,7 @@ model ShootSession {
   actualSettings   Json?
   /// Capture One offline sync queue — stores {pending: string[]} of session IDs awaiting retry
   captureOneSyncQueue Json?
-  /// Rating 1–5 (CHECK constraint enforced at app layer; SQLite has no CHECK via Prisma)
+  /// Rating 1–5
   userRating       Int?
   notes            String?
   isPlan           Boolean   @default(false)

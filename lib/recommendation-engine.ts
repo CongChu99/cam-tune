@@ -148,7 +148,8 @@ Provide exactly 3 suggestions ordered by confidence descending.`
  * The actual scene frame image is injected separately as an image_url content part.
  */
 export function buildUserPrompt(
-  shootIntent?: ShootIntent
+  shootIntent?: ShootIntent,
+  quickMode = false
 ): string {
   // Validate shootIntent against whitelist
   const safeIntent = VALID_INTENTS.includes(shootIntent as any) ? shootIntent : 'general'
@@ -156,20 +157,43 @@ export function buildUserPrompt(
     ? `I'm shooting ${safeIntent} photography. `
     : ''
 
-  return `${intentNote}Please analyze this scene and provide exactly 3 camera settings recommendations, ordered by confidence (highest first). Include a detailed explanation for each setting so I can learn why each choice was made.`
+  const explanationNote = quickMode
+    ? 'Omit the explanation field from each suggestion.'
+    : 'Include a brief 1-sentence explanation per setting field (iso, aperture, shutter, whiteBalance, meteringMode).'
+
+  return `${intentNote}Based on the location and environmental conditions provided, give exactly 3 camera settings recommendations ordered by confidence (highest first). ${explanationNote} Return only valid JSON, no extra text.`
 }
 
 // ─── Response parser ──────────────────────────────────────────────────────────
 
 /**
- * Strips markdown code fences (```json ... ``` or ``` ... ```) from a string.
- * Handles multiple fences and language tags robustly.
+ * Extracts the first complete JSON object from a string using bracket-depth
+ * tracking. Handles leading/trailing prose, code fences, and extra text after
+ * the closing brace.
  */
-function stripMarkdownFences(text: string): string {
-  return text
-    .replace(/^```[\w]*\n?/gm, '')  // opening fences with optional language
-    .replace(/^```\s*$/gm, '')       // closing fences
-    .trim()
+function extractFirstJSON(text: string): string {
+  const start = text.indexOf('{')
+  if (start === -1) return text.trim()
+
+  let depth = 0
+  let inString = false
+  let escape = false
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (escape) { escape = false; continue }
+    if (ch === '\\' && inString) { escape = true; continue }
+    if (ch === '"') { inString = !inString; continue }
+    if (inString) continue
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+
+  // Fallback: return from start to end
+  return text.slice(start)
 }
 
 /**
@@ -232,7 +256,7 @@ function coerceSuggestion(raw: Record<string, unknown>, index: number): Suggesti
  * Validates that exactly 3 suggestions are returned.
  */
 export function parseAIResponse(raw: string): RecommendationResult {
-  const cleaned = stripMarkdownFences(raw)
+  const cleaned = extractFirstJSON(raw)
 
   let parsed: Record<string, unknown>
   try {
@@ -264,10 +288,8 @@ export function parseAIResponse(raw: string): RecommendationResult {
     throw new Error('AI response missing suggestions array')
   }
 
-  if (rawSuggestions.length < 3) {
-    throw new Error(
-      `Expected 3 suggestions from AI, got ${rawSuggestions.length}`
-    )
+  if (rawSuggestions.length === 0) {
+    throw new Error('AI returned no suggestions')
   }
 
   // Take top 3 (in case AI returns more), coerce each

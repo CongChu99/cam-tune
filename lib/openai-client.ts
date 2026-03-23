@@ -97,12 +97,23 @@ export function decryptApiKey(ciphertext: string): string {
 // OpenAI client factory
 // ---------------------------------------------------------------------------
 
+export const OLLAMA_KEY = "ollama";
+export const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1";
+
 /**
- * Creates a new OpenAI client for the given API key.
- * Never stores the instance globally — one client per request.
+ * Creates a new OpenAI-compatible client.
+ * Pass apiKey = "ollama" to connect to local Ollama instance.
  */
 export function createClient(apiKey: string): OpenAI {
+  if (apiKey === OLLAMA_KEY) {
+    return new OpenAI({ apiKey: "ollama", baseURL: OLLAMA_BASE_URL });
+  }
   return new OpenAI({ apiKey });
+}
+
+/** Returns true if the stored key indicates Ollama mode */
+export function isOllamaMode(apiKey: string): boolean {
+  return apiKey === OLLAMA_KEY;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,22 +148,34 @@ export interface ModelInfo {
  * Throws an error with a user-friendly message on failure.
  */
 export async function validateKey(apiKey: string): Promise<ModelInfo[]> {
-  const client = createClient(apiKey);
+  // Ollama mode — fetch model list from local Ollama API
+  if (apiKey === OLLAMA_KEY) {
+    try {
+      const res = await fetch(`${OLLAMA_BASE_URL.replace('/v1', '')}/api/tags`);
+      if (!res.ok) throw new Error(`Ollama returned ${res.status}`);
+      const data = await res.json() as { models: { name: string; modified_at: string }[] };
+      return (data.models ?? []).map((m) => ({
+        id: m.name,
+        created: new Date(m.modified_at).getTime(),
+      }));
+    } catch {
+      throw new Error("Không kết nối được Ollama — đảm bảo Ollama đang chạy tại localhost:11434");
+    }
+  }
 
+  // OpenAI mode
+  const client = createClient(apiKey);
   try {
     const modelsPage = await client.models.list();
     const visionModels = modelsPage.data
       .filter((m) => isVisionCapable(m.id))
       .sort((a, b) => b.created - a.created)
       .map((m) => ({ id: m.id, created: m.created }));
-
     return visionModels;
   } catch (err: unknown) {
     if (err instanceof OpenAI.APIError) {
       if (err.status === 401) {
-        throw new Error(
-          "Invalid API key — please check your OpenAI dashboard"
-        );
+        throw new Error("Invalid API key — please check your OpenAI dashboard");
       }
       throw new Error(`OpenAI API error: ${err.message}`);
     }

@@ -10,7 +10,7 @@
  */
 
 import crypto from "crypto";
-import { Redis } from "@upstash/redis";
+import Redis from "ioredis";
 import prisma from "@/lib/prisma";
 import { encryptApiKey, decryptApiKey } from "@/lib/openai-client";
 import { generateXmp, type XmpSessionData } from "@/lib/xmp-generator";
@@ -49,13 +49,10 @@ let _redis: Redis | null = null;
 
 function getRedis(): Redis | null {
   if (_redis) return _redis;
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (!process.env.REDIS_URL) {
     return null;
   }
-  _redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  });
+  _redis = new Redis(process.env.REDIS_URL).on('error', () => {});
   return _redis;
 }
 
@@ -366,7 +363,7 @@ async function uploadXmpSidecar(
 export async function enqueueSyncItem(userId: string, sessionId: string): Promise<void> {
   const redis = getRedis();
   if (!redis) {
-    console.warn('[LightroomService] Upstash Redis not configured — sync item not queued for retry')
+    console.warn('[LightroomService] Redis not configured — sync item not queued for retry')
     return
   }
   await redis.rpush(SYNC_QUEUE_KEY(userId), sessionId);
@@ -383,7 +380,7 @@ export async function dequeuePendingSessions(userId: string): Promise<string[]> 
   const items: string[] = [];
   // LPOP up to 100 items atomically
   for (let i = 0; i < 100; i++) {
-    const item = await redis.lpop<string>(key);
+    const item = await redis.lpop(key);
     if (item === null) break;
     items.push(item);
   }

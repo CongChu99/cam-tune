@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "currentState": "DEPLOY",
+  "currentState": "DONE",
   "feature": {
     "name": "CamTune — AI Camera Settings Advisor",
     "slug": "cam-tune-ai-advisor",
@@ -14,7 +14,10 @@
     "BEADS",
     "PR",
     "CODE_LOOP",
-    "PR_REVIEW_LOOP"
+    "PR_REVIEW_LOOP",
+    "INFRA",
+    "DEPLOY",
+    "DOCS"
   ],
   "failedAttempts": 0,
   "beadsEpic": "cam-tune-20a",
@@ -22,5 +25,7 @@
   "worktree": null,
   "prNumber": 1,
   "lastError": null,
-  "taskLoop": null
+  "taskLoop": null,
+  "wikiUrl": "https://github.com/CongChu99/cam-tune/wiki",
+  "wikiGitUrl": "https://github.com/CongChu99/cam-tune.wiki.git"
 }

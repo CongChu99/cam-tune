@@ -1,15 +1,14 @@
 /**
  * POST /api/recommend
  *
- * Core AI recommendation endpoint. Combines scene frame + GPS + weather +
- * camera DNA to produce top-3 camera settings via OpenAI Vision.
+ * Core AI recommendation endpoint. Combines GPS + weather + camera DNA
+ * to produce top-3 camera settings via OpenAI (text-only).
  *
  * Query params:
  *   ?mode=quick  — strip explanation fields from suggestions
  *
  * Request body:
  *   cameraProfileId  string   UUID of user's camera profile
- *   sceneFrame       string   base64 encoded JPEG from getUserMedia
  *   lat              number
  *   lng              number
  *   shootIntent?     'portrait'|'landscape'|'street'|'event'|'astro'|'macro'
@@ -28,8 +27,8 @@ import OpenAI from 'openai'
 
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { decryptApiKey, createClient } from '@/lib/openai-client'
-import { getLocationContext } from '@/lib/weather-service'
+import { decryptApiKey, createClient, isOllamaMode } from '@/lib/openai-client'
+import { getLocationContext, type WeatherData, type SunData } from '@/lib/weather-service'
 import {
   buildSystemPrompt,
   buildUserPrompt,
@@ -43,7 +42,6 @@ import {
 
 interface RecommendRequestBody {
   cameraProfileId: string
-  sceneFrame: string
   lat: number
   lng: number
   shootIntent?: ShootIntent
@@ -69,11 +67,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { cameraProfileId, sceneFrame, lat, lng, shootIntent } = body
+  const { cameraProfileId, lat, lng, shootIntent } = body
 
-  if (!cameraProfileId || !sceneFrame || lat == null || lng == null) {
+  if (!cameraProfileId || lat == null || lng == null) {
     return NextResponse.json(
-      { error: 'cameraProfileId, sceneFrame, lat, and lng are required' },
+      { error: 'cameraProfileId, lat, and lng are required' },
       { status: 400 }
     )
   }
@@ -171,19 +169,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       : null,
   }
 
-  // ── Fetch weather / location context ─────────────────────────────────────────
-  let locationContext: Awaited<ReturnType<typeof getLocationContext>>
-  try {
-    locationContext = await getLocationContext(lat, lng)
-  } catch (err) {
-    console.error('[/api/recommend] Failed to fetch location context:', err)
-    return NextResponse.json(
-      { error: 'Failed to retrieve weather/location data. Please try again.' },
-      { status: 503 }
-    )
+  // ── Fetch weather / location context (best-effort, fallback to defaults) ─────
+  const now = new Date()
+  const fallbackWeather: WeatherData = {
+    cloudCoverPct: 0, uvIndex: 0, visibilityKm: 10,
+    temperature: 25, humidity: 60,
+    sunrise: '', sunset: '', goldenHourStart: '', goldenHourEnd: '',
   }
+  const fallbackSun: SunData = { altitude: 45, azimuth: 180, isGoldenHour: false, minutesToGoldenHour: 0 }
 
-  const { weather, sun, locationName } = locationContext
+  let weather: WeatherData = fallbackWeather
+  let sun: SunData = fallbackSun
+  let locationName: string = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+
+  try {
+    const ctx = await getLocationContext(lat, lng)
+    weather = ctx.weather
+    sun = ctx.sun
+    locationName = ctx.locationName
+  } catch (err) {
+    console.warn('[/api/recommend] Weather fetch failed, using fallback:', err instanceof Error ? err.message : err)
+  }
 
   // ── Build prompts ─────────────────────────────────────────────────────────────
   const systemPrompt = buildSystemPrompt(
@@ -193,38 +199,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     locationName,
     shootIntent
   )
-  const userPrompt = buildUserPrompt(shootIntent)
+  const userPrompt = buildUserPrompt(shootIntent, isQuickMode)
 
-  // ── Call OpenAI Vision ────────────────────────────────────────────────────────
+  // ── Call OpenAI ────────────────────────────────────────────────────────────
   const modelId = user.openaiModelId ?? 'gpt-4o'
   const openai: OpenAI = createClient(apiKey)
+  const ollamaMode = isOllamaMode(apiKey)
 
   let rawAIResponse: string
   try {
     const completion = await openai.chat.completions.create({
       model: modelId,
-      max_tokens: 2000,
+      max_tokens: 1800,
       messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/jpeg;base64,${sceneFrame}`,
-                detail: 'high',
-              },
-            },
-            {
-              type: 'text',
-              text: userPrompt,
-            },
-          ],
-        },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
       ],
     })
 
@@ -248,10 +237,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         )
       }
       if (err.status === 503 || err.status === 500) {
-        return NextResponse.json(
-          { error: 'OpenAI service is temporarily unavailable. Please try again later.' },
-          { status: 503 }
-        )
+        console.error('[/api/recommend] AI backend error:', err.status, err.message, err.error)
+        const detail = ollamaMode ? `Ollama error: ${err.message}` : 'OpenAI service is temporarily unavailable. Please try again later.'
+        return NextResponse.json({ error: detail }, { status: 503 })
       }
       return NextResponse.json(
         { error: `OpenAI error: ${err.message}` },
@@ -266,6 +254,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // ── Parse AI response ─────────────────────────────────────────────────────────
+  console.log('[/api/recommend] Raw AI response:', rawAIResponse.slice(0, 500))
   let parsed: ReturnType<typeof parseAIResponse>
   try {
     parsed = parseAIResponse(rawAIResponse)
