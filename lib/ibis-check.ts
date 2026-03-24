@@ -18,6 +18,16 @@ import type { CameraProfileRecord } from './camera-database'
  */
 export interface LensProfileParam {
   focalLengthMm: number
+  focalLengthMinMm?: number
+  focalLengthMaxMm?: number
+  lensType?: 'PRIME' | 'ZOOM'
+  currentFocalLengthMm?: number
+}
+
+export interface ShutterWarningExtendedResult {
+  stabilizationWarning: string | null
+  estimatedFocalLength: boolean
+  usedFocalLengthMm: number
 }
 
 // ─── Shutter string parser ────────────────────────────────────────────────────
@@ -113,4 +123,69 @@ export function checkShutterWarning(
   }
 
   return null
+}
+
+// ─── Extended warning check ──────────────────────────────────────────────────
+
+/**
+ * Resolves the effective focal length from a lens profile, using zoom midpoint
+ * fallback when the current focal length is unknown for zoom lenses.
+ */
+function resolveFocalLength(
+  explicitFocalLengthMm: number | undefined,
+  lensProfile?: LensProfileParam
+): { focal: number; estimated: boolean } {
+  // Explicit focal length always wins
+  if (explicitFocalLengthMm !== undefined) {
+    return { focal: explicitFocalLengthMm, estimated: false }
+  }
+
+  if (!lensProfile) {
+    return { focal: 50, estimated: false }
+  }
+
+  // Zoom lens with current focal length set
+  if (lensProfile.currentFocalLengthMm !== undefined) {
+    return { focal: lensProfile.currentFocalLengthMm, estimated: false }
+  }
+
+  // Zoom lens without current focal length → use midpoint
+  if (
+    lensProfile.lensType === 'ZOOM' &&
+    lensProfile.focalLengthMinMm !== undefined &&
+    lensProfile.focalLengthMaxMm !== undefined
+  ) {
+    const midpoint = Math.round(
+      (lensProfile.focalLengthMinMm + lensProfile.focalLengthMaxMm) / 2
+    )
+    return { focal: midpoint, estimated: true }
+  }
+
+  // Prime or fallback
+  return { focal: lensProfile.focalLengthMm, estimated: false }
+}
+
+/**
+ * Extended shutter warning check that returns structured result with
+ * stabilizationWarning, estimatedFocalLength flag, and usedFocalLengthMm.
+ *
+ * @param shutterSpeed    Shutter speed string
+ * @param cameraProfile   Camera profile with IBIS data
+ * @param focalLengthMm   Explicit focal length override
+ * @param lensProfile     Optional lens profile for focal length resolution
+ */
+export function checkShutterWarningExtended(
+  shutterSpeed: string,
+  cameraProfile: CameraProfileRecord,
+  focalLengthMm?: number,
+  lensProfile?: LensProfileParam
+): ShutterWarningExtendedResult {
+  const { focal, estimated } = resolveFocalLength(focalLengthMm, lensProfile)
+  const warning = checkShutterWarning(shutterSpeed, cameraProfile, focal)
+
+  return {
+    stabilizationWarning: warning,
+    estimatedFocalLength: estimated,
+    usedFocalLengthMm: focal,
+  }
 }
