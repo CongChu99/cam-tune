@@ -11,6 +11,8 @@
 import type { CameraProfileRecord } from './camera-database'
 import type { WeatherData, SunData } from './weather-service'
 import { checkShutterWarning } from './ibis-check'
+import { MOTION_FLOOR_MAP, inferSubjectMotion } from '../types/shooting-intent'
+import type { SubjectMotionSpeed } from '../types/shooting-intent'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,7 +87,7 @@ export interface LensProfileForPrompt {
 
 /**
  * Builds the OpenAI system prompt incorporating camera DNA and environmental context.
- * Optionally includes lens profile information when available.
+ * Optionally includes lens profile and shooting intent information.
  */
 export function buildSystemPrompt(
   cameraProfile: CameraProfileRecord,
@@ -93,7 +95,8 @@ export function buildSystemPrompt(
   sun: SunData,
   locationName: string,
   shootIntent?: ShootIntent,
-  lensProfile?: LensProfileForPrompt
+  lensProfile?: LensProfileForPrompt,
+  shootingIntent?: { subjectMotionSpeed?: string; outputMedium?: string; flashAvailability?: string }
 ): string {
   const db = cameraProfile.cameraDatabase
   const overrides = cameraProfile.customOverrides as Record<string, unknown> | null
@@ -132,6 +135,30 @@ export function buildSystemPrompt(
     lensSection = `\nLens: ${lensProfile.focalLengthMm}mm f/${lensProfile.maxAperture} (${lensTypeStr})\n${oisStr}`
   }
 
+  // Build shooting intent section if provided
+  let shootingIntentSection = ''
+  if (shootingIntent) {
+    const parts: string[] = []
+    if (shootingIntent.subjectMotionSpeed) {
+      parts.push(`- Subject motion: ${shootingIntent.subjectMotionSpeed}`)
+      // Add motion floor hint
+      const motionSpeed = shootingIntent.subjectMotionSpeed as SubjectMotionSpeed
+      const floor = MOTION_FLOOR_MAP[motionSpeed]
+      if (floor && floor > 0) {
+        parts.push(`  → Minimum shutter to freeze: 1/${floor}`)
+      }
+    }
+    if (shootingIntent.outputMedium) {
+      parts.push(`- Output medium: ${shootingIntent.outputMedium}`)
+    }
+    if (shootingIntent.flashAvailability) {
+      parts.push(`- Flash: ${shootingIntent.flashAvailability}`)
+    }
+    if (parts.length > 0) {
+      shootingIntentSection = `\n\nShooting intent details:\n${parts.join('\n')}`
+    }
+  }
+
   return `You are an expert photography assistant. Analyze this scene and recommend camera settings.
 
 Camera: ${brand} ${model}
@@ -146,7 +173,7 @@ Current conditions:
 - Sun altitude: ${sun.altitude}°
 - Time: ${timeString} (${lightCondition})
 
-Shoot intent: ${safeIntent}
+Shoot intent: ${safeIntent}${shootingIntentSection}
 
 Return EXACTLY this JSON (no markdown, no explanation):
 {
