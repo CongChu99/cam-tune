@@ -34,6 +34,17 @@ enum SkillLevel {
   ADVANCED
 }
 
+enum LensType {
+  PRIME
+  ZOOM
+}
+
+enum LensSource {
+  LENSFUN
+  EXIF
+  MANUAL
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -110,13 +121,21 @@ model CameraProfile {
 }
 
 model LensProfile {
-  id                 String   @id @default(uuid())
+  id                 String      @id @default(uuid())
   cameraProfileId    String
   focalLengthMm      Int
   maxAperture        Decimal
   minAperture        Decimal
-  isStabilized       Boolean  @default(false)
+  isStabilized       Boolean     @default(false)
   stabilizationStops Decimal?
+  focalLengthMinMm   Int?
+  focalLengthMaxMm   Int?
+  isVariableAperture Boolean     @default(false)
+  maxApertureTele    Decimal?
+  lensType           LensType?
+  /// External Lensfun database identifier (e.g. "sony/sel50f18f"). Null for manual entries.
+  lensfunId          String?
+  source             LensSource?
 
   cameraProfile CameraProfile @relation(fields: [cameraProfileId], references: [id], onDelete: Cascade)
 }
