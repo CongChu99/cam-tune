@@ -1,31 +1,37 @@
 {
   "version": 1,
-  "currentState": "DONE",
+  "currentState": "DESIGN",
   "feature": {
-    "name": "CamTune — AI Camera Settings Advisor",
-    "slug": "cam-tune-ai-advisor",
-    "description": "App gợi ý thông số máy ảnh (ISO, khẩu độ, tốc độ chụp, white balance...) dựa trên phân tích AI về địa điểm người dùng đang đứng, phù hợp với từng dòng máy ảnh cụ thể."
+    "name": "Detailed AI Camera Parameters",
+    "slug": "detailed-ai-camera-parameters",
+    "description": "Thêm các thông số chi tiết (lens profile, shooting intent, scene context) vào AI recommendation engine của CamTune để AI có thể tìm thông số chính xác hơn: focal length → IBIS check, max aperture constraint, OIS+IBIS combined, dual-native ISO, output medium, flash availability."
   },
   "mode": "research",
-  "startedAt": "2026-03-18",
+  "startedAt": "2026-03-23",
   "completedStates": [
     "RESEARCH",
     "SPEC",
-    "BEADS",
-    "PR",
-    "CODE_LOOP",
-    "PR_REVIEW_LOOP",
-    "INFRA",
-    "DEPLOY",
-    "DOCS"
+    "DESIGN"
   ],
   "failedAttempts": 0,
-  "beadsEpic": "cam-tune-20a",
+  "beadsEpic": null,
   "doltRemote": null,
   "worktree": null,
-  "prNumber": 1,
+  "prNumber": null,
   "lastError": null,
   "taskLoop": null,
   "wikiUrl": "https://github.com/CongChu99/cam-tune/wiki",
-  "wikiGitUrl": "https://github.com/CongChu99/cam-tune.wiki.git"
+  "wikiGitUrl": "https://github.com/CongChu99/cam-tune.wiki.git",
+  "previousFeature": {
+    "name": "CamTune — AI Camera Settings Advisor",
+    "slug": "cam-tune-ai-advisor",
+    "completedState": "DONE",
+    "completedAt": "2026-03-18",
+    "beadsEpic": "cam-tune-20a",
+    "prNumber": 1
+  },
+  "artifacts": {
+    "research": "docs/specs/detailed-ai-camera-parameters/research.md",
+    "design": "docs/c4flow/designs/detailed-ai-camera-parameters/MASTER.md"
+  }
 }
