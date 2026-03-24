@@ -287,6 +287,26 @@ model ShootPlan {
   @@index([plannedAt])
 }
 
+/// Reference lens database seeded from Lensfun XML.
+/// Not user-specific — serves as lookup for lens quick-add and EXIF matching.
+model LensfunLens {
+  id                String    @id @default(uuid())
+  lensfunId         String    @unique
+  manufacturer      String
+  model             String
+  focalLengthMinMm  Int
+  focalLengthMaxMm  Int
+  maxAperture       Decimal
+  lensType          LensType  @default(PRIME)
+  popularityWeight  Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([manufacturer])
+  @@index([model])
+  @@index([popularityWeight])
+}
+
 model LensExifUnmatched {
   id                 String   @id @default(uuid())
   rawLensModelString String
