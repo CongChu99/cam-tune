@@ -73,14 +73,27 @@ export interface RecommendationResult {
 const VALID_INTENTS = ['portrait', 'landscape', 'street', 'event', 'astro', 'macro', 'general'] as const
 
 /**
+ * Minimal lens profile shape for prompt serialization.
+ */
+export interface LensProfileForPrompt {
+  focalLengthMm: number
+  maxAperture: number
+  lensType?: string
+  isStabilized?: boolean
+  stabilizationStops?: number | null
+}
+
+/**
  * Builds the OpenAI system prompt incorporating camera DNA and environmental context.
+ * Optionally includes lens profile information when available.
  */
 export function buildSystemPrompt(
   cameraProfile: CameraProfileRecord,
   weather: WeatherData,
   sun: SunData,
   locationName: string,
-  shootIntent?: ShootIntent
+  shootIntent?: ShootIntent,
+  lensProfile?: LensProfileForPrompt
 ): string {
   const db = cameraProfile.cameraDatabase
   const overrides = cameraProfile.customOverrides as Record<string, unknown> | null
@@ -109,12 +122,22 @@ export function buildSystemPrompt(
 
   const lightCondition = sun.isGoldenHour ? 'Golden hour' : 'Normal light'
 
+  // Build lens section if profile provided
+  let lensSection = ''
+  if (lensProfile) {
+    const lensTypeStr = lensProfile.lensType ?? 'Unknown'
+    const oisStr = lensProfile.isStabilized
+      ? `OIS: Yes (${lensProfile.stabilizationStops ?? '?'} stops)`
+      : 'OIS: No'
+    lensSection = `\nLens: ${lensProfile.focalLengthMm}mm f/${lensProfile.maxAperture} (${lensTypeStr})\n${oisStr}`
+  }
+
   return `You are an expert photography assistant. Analyze this scene and recommend camera settings.
 
 Camera: ${brand} ${model}
 Sensor: ${sensorSize} | Base ISO: ${baseIso} | Max usable ISO: ${maxUsableIso}
 IBIS: ${ibisDescription}
-Dynamic range: ${dynamicRangeEv} EV
+Dynamic range: ${dynamicRangeEv} EV${lensSection}
 
 Current conditions:
 - Location: ${locationName}
