@@ -39,6 +39,15 @@ export interface Suggestion {
   confidence: number
   primaryDriver: string
   explanation?: SuggestionExplanation
+  apertureClampApplied: boolean
+  apertureClampNote?: string
+}
+
+/**
+ * Minimal lens profile shape used by coerceSuggestion for aperture clamping.
+ */
+export interface LensProfileForCoercion {
+  maxAperture: number
 }
 
 export interface SceneAnalysis {
@@ -198,11 +207,20 @@ function extractFirstJSON(text: string): string {
 
 /**
  * Validates and coerces a raw parsed suggestion object into a typed Suggestion.
+ * Optionally clamps aperture to lensProfile.maxAperture.
  * Throws if critical fields are missing or unparseable.
+ *
+ * @param raw           Raw suggestion object from AI response
+ * @param index         Index in the suggestions array (for error messages)
+ * @param lensProfile   Optional lens profile for aperture clamping
  */
-function coerceSuggestion(raw: Record<string, unknown>, index: number): Suggestion {
+export function coerceSuggestion(
+  raw: Record<string, unknown>,
+  index: number,
+  lensProfile?: LensProfileForCoercion
+): Suggestion {
   const iso = Number(raw.iso)
-  const aperture = Number(raw.aperture)
+  let aperture = Number(raw.aperture)
   const shutter = String(raw.shutter ?? '')
   const whiteBalance = String(raw.whiteBalance ?? '')
   const meteringMode = String(raw.meteringMode ?? '')
@@ -225,6 +243,17 @@ function coerceSuggestion(raw: Record<string, unknown>, index: number): Suggesti
     throw new Error(`Suggestion[${index}] shutter speed format invalid (expected "1/500", "2.5", or "1/8000s"), got "${shutter}"`)
   }
 
+  // Aperture clamp: if AI suggests wider (lower f-number) than lens max aperture, clamp
+  let apertureClampApplied = false
+  let apertureClampNote: string | undefined
+  const requestedAperture = aperture
+
+  if (lensProfile && aperture < lensProfile.maxAperture) {
+    aperture = lensProfile.maxAperture
+    apertureClampApplied = true
+    apertureClampNote = `f/${requestedAperture} requested but your lens maximum is f/${lensProfile.maxAperture}`
+  }
+
   const suggestion: Suggestion = {
     iso,
     aperture,
@@ -233,6 +262,11 @@ function coerceSuggestion(raw: Record<string, unknown>, index: number): Suggesti
     meteringMode,
     confidence,
     primaryDriver,
+    apertureClampApplied,
+  }
+
+  if (apertureClampNote) {
+    suggestion.apertureClampNote = apertureClampNote
   }
 
   // Include explanation if present (learning mode)
