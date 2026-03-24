@@ -1,22 +1,206 @@
 {
   "version": 1,
-  "currentState": "DESIGN",
+  "currentState": "APERANT_MONITOR",
   "feature": {
     "name": "Detailed AI Camera Parameters",
     "slug": "detailed-ai-camera-parameters",
     "description": "Thêm các thông số chi tiết (lens profile, shooting intent, scene context) vào AI recommendation engine của CamTune để AI có thể tìm thông số chính xác hơn: focal length → IBIS check, max aperture constraint, OIS+IBIS combined, dual-native ISO, output medium, flash availability."
   },
   "mode": "research",
-  "implementationMode": null,
+  "implementationMode": "aperant",
   "startedAt": "2026-03-23",
   "completedStates": [
     "RESEARCH",
-    "SPEC"
+    "SPEC",
+    "DESIGN",
+    "BEADS",
+    "APERANT_INJECT"
   ],
   "failedAttempts": 0,
-  "beadsEpic": null,
-  "aperantPushedBeads": [],
-  "doltRemote": null,
+  "beadsEpic": "cam-tune-y7i",
+  "aperantPushedBeads": [
+    {
+      "beadId": "cam-tune-y7i.1",
+      "specId": "001-prisma-extend-lensprofile-model-with-optical-fields"
+    },
+    {
+      "beadId": "cam-tune-y7i.4",
+      "specId": "002-lensfun-download-xml-write-parse-script-to-extract-lens-records"
+    },
+    {
+      "beadId": "cam-tune-y7i.2",
+      "specId": "003-prisma-add-lens-exif-unmatched-table-migration"
+    },
+    {
+      "beadId": "cam-tune-y7i.3",
+      "specId": "004-prisma-add-dualnativeiso-maxflashsyncspeed-to-camera-model"
+    },
+    {
+      "beadId": "cam-tune-y7i.5",
+      "specId": "005-lensfun-write-supabase-seed-import-script-with-popularity-weighting"
+    },
+    {
+      "beadId": "cam-tune-y7i.11",
+      "specId": "006-ibis-check-ts-accept-lensprofile-param-replace-hardcoded-50mm-with-actual-focal-length"
+    },
+    {
+      "beadId": "cam-tune-y7i.14",
+      "specId": "007-coercesuggestion-aperture-clamp-to-lensprofile-maxaperture-apertureclampapplied-flag"
+    },
+    {
+      "beadId": "cam-tune-y7i.6",
+      "specId": "008-lensdatabaseservice-search-query-method-with-popularity-sort"
+    },
+    {
+      "beadId": "cam-tune-y7i.9",
+      "specId": "009-api-crud-routes-for-api-lens-profiles-create-list-delete-activate"
+    },
+    {
+      "beadId": "cam-tune-y7i.12",
+      "specId": "010-ibis-check-ts-zoom-midpoint-fallback-estimatedfocallength-flag-stabilizationwarning-output"
+    },
+    {
+      "beadId": "cam-tune-y7i.15",
+      "specId": "011-coercesuggestion-variable-aperture-zoom-tele-end-maxaperturetele-detection-clamp"
+    },
+    {
+      "beadId": "cam-tune-y7i.16",
+      "specId": "012-enforceflashsync-flash-sync-speed-validator-flashsyncwarning-output"
+    },
+    {
+      "beadId": "cam-tune-y7i.17",
+      "specId": "013-checkdiffraction-sensor-size-diffraction-threshold-table-diffractionwarning-output"
+    },
+    {
+      "beadId": "cam-tune-y7i.18",
+      "specId": "014-builddualnativeisohint-prompt-injection-string-dualnativeisoapplied-flag"
+    },
+    {
+      "beadId": "cam-tune-y7i.7",
+      "specId": "015-lensdatabaseservice-matchexif-levenshtein-fuzzy-match-unmatched-logging"
+    },
+    {
+      "beadId": "cam-tune-y7i.8",
+      "specId": "016-api-get-api-lens-search-route"
+    },
+    {
+      "beadId": "cam-tune-y7i.13",
+      "specId": "017-ibis-check-ts-combined-ois-ibis-stops-calculation-with-8-stop-cap"
+    },
+    {
+      "beadId": "cam-tune-y7i.35",
+      "specId": "018-buildxmp-add-cameratune-lensprofile-field-namespace-declaration"
+    },
+    {
+      "beadId": "cam-tune-y7i.39",
+      "specId": "019-tests-unit-tests-for-coercesuggestion-aperture-clamp-simple-variable-aperture-no-lens"
+    },
+    {
+      "beadId": "cam-tune-y7i.40",
+      "specId": "020-tests-unit-tests-for-enforceflashsync-speedlight-hss-studio-strobe-camera-specific-sync"
+    },
+    {
+      "beadId": "cam-tune-y7i.41",
+      "specId": "021-tests-unit-tests-for-checkdiffraction-aps-c-ff-mft-web-no-warning-commercial"
+    },
+    {
+      "beadId": "cam-tune-y7i.10",
+      "specId": "022-exifextractorclient-extract-lensmodel-field-post-api-lens-detect-exif-route"
+    },
+    {
+      "beadId": "cam-tune-y7i.19",
+      "specId": "023-buildsystemprompt-extend-to-serialize-lensprofile-fields-into-ai-prompt"
+    },
+    {
+      "beadId": "cam-tune-y7i.36",
+      "specId": "024-buildxmp-add-cameratune-outputmedium-shadowpriority-flashmode-subjectmotion-omit-on-null-logic"
+    },
+    {
+      "beadId": "cam-tune-y7i.38",
+      "specId": "025-tests-unit-tests-for-ibis-check-ts-prime-zoom-midpoint-combined-cap-no-is-backward-compat"
+    },
+    {
+      "beadId": "cam-tune-y7i.20",
+      "specId": "026-buildsystemprompt-serialize-shootingintent-motion-output-flash-motion-floor-injection-defaults"
+    },
+    {
+      "beadId": "cam-tune-y7i.37",
+      "specId": "027-lightroom-panel-shoot-context-section-from-cameratune-xmp-fields"
+    },
+    {
+      "beadId": "cam-tune-y7i.45",
+      "specId": "028-tests-xmp-round-trip-lens-profile-intent-fields-written-null-fields-omitted-existing-fields-intact"
+    },
+    {
+      "beadId": "cam-tune-y7i.21",
+      "specId": "029-structured-output-recommendationresultschema-isstructuredoutputsupported-api-call-wiring"
+    },
+    {
+      "beadId": "cam-tune-y7i.23",
+      "specId": "030-ui-lenspickermodal-search-input-debounced-results-list"
+    },
+    {
+      "beadId": "cam-tune-y7i.24",
+      "specId": "031-ui-manuallensentryform-focal-length-aperture-is-fields-validation"
+    },
+    {
+      "beadId": "cam-tune-y7i.25",
+      "specId": "032-ui-exiflensdetectflow-upload-photo-confirm-edit-matched-lens-unmatched-fallback"
+    },
+    {
+      "beadId": "cam-tune-y7i.42",
+      "specId": "033-tests-unit-tests-for-buildsystemprompt-serialization-isstructuredoutputsupported-model-detection"
+    },
+    {
+      "beadId": "cam-tune-y7i.22",
+      "specId": "034-coercesuggestion-wire-all-new-validators-into-pipeline-clamp-is-cap-flash-sync-diffraction-dual-native"
+    },
+    {
+      "beadId": "cam-tune-y7i.26",
+      "specId": "035-ui-active-lens-indicator-in-recommendation-header-no-lens-yellow-warning-add-lens-shortcut"
+    },
+    {
+      "beadId": "cam-tune-y7i.43",
+      "specId": "036-tests-integration-test-full-recommendation-with-all-signals-lens-intent-camera"
+    },
+    {
+      "beadId": "cam-tune-y7i.27",
+      "specId": "037-ui-switch-active-lens-handler-activate-api-call-trigger-recommendation-regeneration"
+    },
+    {
+      "beadId": "cam-tune-y7i.28",
+      "specId": "038-ui-shotdetailspanel-expandable-section-quick-learning-mode-behavior"
+    },
+    {
+      "beadId": "cam-tune-y7i.29",
+      "specId": "039-ui-subjectmotionselector-5-level-segmented-control-inferred-pre-selection-from-shoot-type"
+    },
+    {
+      "beadId": "cam-tune-y7i.30",
+      "specId": "040-ui-outputmediumdropdown-5-options-default-web-1080p"
+    },
+    {
+      "beadId": "cam-tune-y7i.31",
+      "specId": "041-ui-flashavailabilityselector-4-options-default-no-flash"
+    },
+    {
+      "beadId": "cam-tune-y7i.32",
+      "specId": "042-ui-zoompositioninput-session-level-zoom-position-for-zoom-lenses"
+    },
+    {
+      "beadId": "cam-tune-y7i.33",
+      "specId": "043-ui-recommendation-card-inline-warnings-aperture-clamp-flash-sync-diffraction-ibis-estimate"
+    },
+    {
+      "beadId": "cam-tune-y7i.34",
+      "specId": "044-ui-recommendation-card-estimated-lens-profile-missing-amber-label-when-no-lens"
+    },
+    {
+      "beadId": "cam-tune-y7i.44",
+      "specId": "045-tests-regression-test-no-lens-profile-produces-identical-output-to-pre-feature-behavior"
+    }
+  ],
+  "doltRemote": "congcp/cam-tune-beads",
   "worktree": null,
   "prNumber": null,
   "lastError": null,
