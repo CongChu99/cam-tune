@@ -90,6 +90,8 @@ model CameraDatabase {
   dualNativeIso       Boolean    @default(false)
   /// Comma-separated ISO values for dual native ISO (e.g. "800,12800").
   dualNativeIsoValues String?
+  /// Maximum flash sync speed in 1/x seconds (e.g. 250 means 1/250s). Null if unknown.
+  maxFlashSyncSpeed   Int?
   dynamicRangeEv      Decimal?
   releaseYear         Int?
   mount               String?
