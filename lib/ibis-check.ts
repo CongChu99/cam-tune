@@ -52,6 +52,27 @@ export function parseShutterSpeed(shutter: string): number {
   return parseFloat(trimmed) || 0
 }
 
+// ─── Combined stabilization ──────────────────────────────────────────────────
+
+/** Maximum combined stabilization stops (physics limit) */
+const MAX_COMBINED_STOPS = 8
+
+/**
+ * Calculates combined stabilization stops from IBIS and OIS (lens IS),
+ * capped at 8 stops (practical physics limit).
+ *
+ * @param ibisStops  Camera body IBIS stops (0 if no IBIS)
+ * @param oisStops   Lens optical stabilization stops (0 if no OIS)
+ * @returns          Combined stops, capped at MAX_COMBINED_STOPS
+ */
+export function getCombinedStabilizationStops(
+  ibisStops: number,
+  oisStops: number = 0
+): number {
+  const total = ibisStops + oisStops
+  return Math.min(total, MAX_COMBINED_STOPS)
+}
+
 // ─── IBIS minimum shutter ─────────────────────────────────────────────────────
 
 /**
