@@ -45,9 +45,14 @@ export interface Suggestion {
 
 /**
  * Minimal lens profile shape used by coerceSuggestion for aperture clamping.
+ * Extended fields support variable-aperture zoom lenses.
  */
 export interface LensProfileForCoercion {
   maxAperture: number
+  isVariableAperture?: boolean
+  maxApertureTele?: number
+  focalLengthMaxMm?: number
+  currentFocalLengthMm?: number
 }
 
 export interface SceneAnalysis {
@@ -248,10 +253,32 @@ export function coerceSuggestion(
   let apertureClampNote: string | undefined
   const requestedAperture = aperture
 
-  if (lensProfile && aperture < lensProfile.maxAperture) {
-    aperture = lensProfile.maxAperture
-    apertureClampApplied = true
-    apertureClampNote = `f/${requestedAperture} requested but your lens maximum is f/${lensProfile.maxAperture}`
+  if (lensProfile) {
+    // Determine effective max aperture based on variable aperture zoom position
+    let effectiveMaxAperture = lensProfile.maxAperture
+
+    if (
+      lensProfile.isVariableAperture &&
+      lensProfile.maxApertureTele !== undefined &&
+      lensProfile.focalLengthMaxMm !== undefined &&
+      lensProfile.currentFocalLengthMm !== undefined &&
+      lensProfile.currentFocalLengthMm >= lensProfile.focalLengthMaxMm * 0.7
+    ) {
+      // At tele end (>= 70% of max focal length), use tele aperture
+      effectiveMaxAperture = lensProfile.maxApertureTele
+    }
+
+    if (aperture < effectiveMaxAperture) {
+      aperture = effectiveMaxAperture
+      apertureClampApplied = true
+
+      // Include focal length context for variable aperture zooms
+      if (lensProfile.isVariableAperture && lensProfile.currentFocalLengthMm !== undefined) {
+        apertureClampNote = `At ${lensProfile.currentFocalLengthMm}mm, your lens maximum is f/${effectiveMaxAperture}`
+      } else {
+        apertureClampNote = `f/${requestedAperture} requested but your lens maximum is f/${effectiveMaxAperture}`
+      }
+    }
   }
 
   const suggestion: Suggestion = {
