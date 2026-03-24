@@ -1,30 +1,21 @@
 {
   "version": 1,
-  "currentState": "CODE_LOOP",
+  "currentState": "APERANT_MONITOR",
   "feature": {
     "name": "Detailed AI Camera Parameters",
     "slug": "detailed-ai-camera-parameters",
     "description": "Thêm các thông số chi tiết (lens profile, shooting intent, scene context) vào AI recommendation engine của CamTune để AI có thể tìm thông số chính xác hơn: focal length → IBIS check, max aperture constraint, OIS+IBIS combined, dual-native ISO, output medium, flash availability."
   },
   "mode": "research",
-  "implementationMode": "classic",
+  "implementationMode": "aperant",
   "startedAt": "2026-03-23",
   "completedStates": [
     "RESEARCH",
     "SPEC",
     "DESIGN",
     "BEADS",
-    "APERANT_INJECT",
-    "APERANT_MONITOR"
+    "APERANT_INJECT"
   ],
-  "taskLoop": {
-    "currentTaskId": "cam-tune-y7i.1",
-    "currentTaskSlug": "prisma-extend-lensprofile-model-with-optical-fields",
-    "currentBranch": "feat/cam-tune-y7i.1-prisma-extend-lensprofile-model-with-optical-fields",
-    "subState": "CODING",
-    "completedTasks": [],
-    "failedTasks": []
-  },
   "failedAttempts": 0,
   "beadsEpic": "cam-tune-y7i",
   "aperantPushedBeads": [
