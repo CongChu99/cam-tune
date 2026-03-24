@@ -10,6 +10,16 @@
 
 import type { CameraProfileRecord } from './camera-database'
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+/**
+ * Minimal lens profile shape accepted by ibis-check.
+ * Avoids importing full Prisma types so callers can pass plain objects.
+ */
+export interface LensProfileParam {
+  focalLengthMm: number
+}
+
 // ─── Shutter string parser ────────────────────────────────────────────────────
 
 /**
@@ -58,15 +68,18 @@ export function getMinShutterSpeed(focalLengthMm: number, ibisStops: number): nu
  *
  * @param shutterSpeed    Shutter speed string (e.g. "1/60", "1/500", "1")
  * @param cameraProfile   Camera profile with cameraDatabase IBIS data
- * @param focalLengthMm   Effective focal length; defaults to 50mm if not provided
+ * @param focalLengthMm   Explicit focal length override; takes precedence over lensProfile
+ * @param lensProfile     Optional lens profile; uses its focalLengthMm if focalLengthMm not explicitly provided
  * @returns               Warning string if below threshold, null if safe
  */
 export function checkShutterWarning(
   shutterSpeed: string,
   cameraProfile: CameraProfileRecord,
-  focalLengthMm?: number
+  focalLengthMm?: number,
+  lensProfile?: LensProfileParam
 ): string | null {
-  const focal = focalLengthMm ?? 50
+  // Priority: explicit focalLengthMm > lensProfile.focalLengthMm > default 50mm
+  const focal = focalLengthMm ?? lensProfile?.focalLengthMm ?? 50
   const db = cameraProfile.cameraDatabase
 
   // Determine IBIS stops: prefer camera database value, allow profile override
