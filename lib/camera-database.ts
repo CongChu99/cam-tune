@@ -24,6 +24,7 @@ export type CameraDatabaseRecord = {
   dynamicRangeEv: number | null;
   releaseYear: number | null;
   mount: string | null;
+  maxFlashSyncSpeed: number | null;
 };
 
 export type CameraProfileRecord = {
@@ -246,6 +247,7 @@ function toCameraDatabaseRecord(
       raw.dynamicRangeEv !== null ? Number(raw.dynamicRangeEv) : null,
     releaseYear: raw.releaseYear ?? null,
     mount: raw.mount ?? null,
+    maxFlashSyncSpeed: raw.maxFlashSyncSpeed ?? null,
   };
 }
 
