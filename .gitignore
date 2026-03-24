@@ -49,3 +49,6 @@ next-env.d.ts
 *.db
 *.db-shm
 *.db-wal
+
+# Auto Claude data directory
+.auto-claude/
