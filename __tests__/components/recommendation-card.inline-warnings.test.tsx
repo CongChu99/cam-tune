@@ -274,6 +274,18 @@ describe('IBIS estimated focal length soft prompt', () => {
     // Soft prompt should NOT have role="alert"
     expect(promptEl.closest('[role="alert"]')).toBeNull()
   })
+
+  it('shows IBIS soft prompt in Quick Mode (always visible, not mode-gated)', () => {
+    vi.mocked(useUIMode).mockReturnValue({ mode: 'quick' })
+    render(
+      <RecommendationCard
+        suggestion={baseSuggestion}
+        index={0}
+        ibisEstimatedFocalLengthPrompt={ibisPrompt}
+      />
+    )
+    expect(screen.getByText(ibisPrompt)).toBeInTheDocument()
+  })
 })
 
 // ─── Learning Mode only: stabilization cap note ───────────────────────────────

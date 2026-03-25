@@ -208,20 +208,24 @@ export function RecommendationCard({
             clickable={isQuick && !!suggestion.explanation}
             onClick={() => openSheet('iso')}
           />
-          <SettingRow
-            label="Aperture"
-            value={`f/${suggestion.aperture.toFixed(1)}`}
-            clickable={isQuick && !!suggestion.explanation}
-            onClick={() => openSheet('aperture')}
-          />
-          {apertureClampNote && <InlineAmberNote message={apertureClampNote} />}
-          <SettingRow
-            label="Shutter"
-            value={`${suggestion.shutter}s`}
-            clickable={isQuick && !!suggestion.explanation}
-            onClick={() => openSheet('shutter')}
-          />
-          {flashSyncWarning && <InlineAmberNote message={flashSyncWarning} />}
+          <div>
+            <SettingRow
+              label="Aperture"
+              value={`f/${suggestion.aperture.toFixed(1)}`}
+              clickable={isQuick && !!suggestion.explanation}
+              onClick={() => openSheet('aperture')}
+            />
+            {apertureClampNote && <InlineAmberNote message={apertureClampNote} />}
+          </div>
+          <div>
+            <SettingRow
+              label="Shutter"
+              value={`${suggestion.shutter}s`}
+              clickable={isQuick && !!suggestion.explanation}
+              onClick={() => openSheet('shutter')}
+            />
+            {flashSyncWarning && <InlineAmberNote message={flashSyncWarning} />}
+          </div>
           <SettingRow
             label="White Balance"
             value={suggestion.whiteBalance}
