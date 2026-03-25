@@ -1,38 +1,18 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-03-19T17:35:16Z",
-  "expires_at": "2026-03-19T18:35:16Z",
-  "gate_id": "cam-tune-5gn",
+  "generated_at": "2026-03-25T02:37:00Z",
+  "expires_at": "2026-03-25T03:37:00Z",
+  "gate_id": "cam-tune-3o0",
   "overall_pass": false,
   "checks": {
     "codex_review": {
-      "ran_at": "2026-03-19T17:35:16Z",
       "pass": true,
+      "ran_at": "2026-03-25T02:37:00Z",
       "critical_count": 0,
       "high_count": 0,
       "medium_count": 1,
-      "low_count": 2,
-      "summary": "0 CRITICAL, 0 HIGH. 1 MEDIUM (Redis singleton), 2 LOW (timing-safe edge case, queueFailedSync userId filter).",
-      "findings": [
-        {
-          "severity": "MEDIUM",
-          "file": "app/api/integrations/captureone/sync/route.ts",
-          "line": 42,
-          "message": "Redis client re-instantiated on every request in checkRateLimit — should use module-level singleton."
-        },
-        {
-          "severity": "LOW",
-          "file": "app/api/integrations/captureone/sync/route.ts",
-          "line": 62,
-          "message": "timingSafeEqual length-mismatch path uses 1-byte dummy buffer — not fully constant-time."
-        },
-        {
-          "severity": "LOW",
-          "file": "lib/captureone-service.ts",
-          "line": 166,
-          "message": "queueFailedSync findUnique lacks userId filter — internal-only, low exploitability."
-        }
-      ]
+      "low_count": 1,
+      "summary": "All tests pass. HIGH issues fixed. Route path matches bead spec."
     },
     "bd_preflight": {
       "pass": null,

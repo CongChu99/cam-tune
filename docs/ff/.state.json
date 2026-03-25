@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "currentState": "APERANT_MONITOR",
+  "currentState": "CODE_LOOP",
   "feature": {
     "name": "Detailed AI Camera Parameters",
     "slug": "detailed-ai-camera-parameters",
@@ -14,7 +14,8 @@
     "SPEC",
     "DESIGN",
     "BEADS",
-    "APERANT_INJECT"
+    "APERANT_INJECT",
+    "APERANT_MONITOR"
   ],
   "failedAttempts": 0,
   "beadsEpic": "cam-tune-y7i",
@@ -205,5 +206,13 @@
   "prNumber": null,
   "lastError": null,
   "wikiUrl": "https://github.com/CongChu99/cam-tune/wiki",
-  "wikiGitUrl": "https://github.com/CongChu99/cam-tune.wiki.git"
+  "wikiGitUrl": "https://github.com/CongChu99/cam-tune.wiki.git",
+  "taskLoop": {
+    "currentTaskId": "cam-tune-y7i.8",
+    "currentTaskSlug": "api-lens-search-route",
+    "currentBranch": "feat/cam-tune-y7i.8-api-lens-search-route",
+    "subState": "REVIEWING",
+    "completedTasks": [],
+    "failedTasks": []
+  }
 }
