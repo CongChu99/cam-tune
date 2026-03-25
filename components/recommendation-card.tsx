@@ -7,7 +7,15 @@
  * Quick Mode:    compact layout; tap any setting row → bottom sheet with explanation.
  *
  * First suggestion (index 0) is highlighted as "Recommended".
- * IBIS warning is shown when shutterSpeedWarning is passed.
+ *
+ * Inline warnings/notes supported:
+ *   shutterSpeedWarning        — IBIS / hand-hold limit amber box
+ *   diffractionWarning         — aperture diffraction amber box
+ *   apertureClampNote          — amber text below aperture row
+ *   flashSyncWarning           — amber text below shutter row
+ *   ibisEstimatedFocalLengthPrompt — soft informational note (always visible)
+ *   stabilizationCapNote       — soft note (Learning Mode only)
+ *   dualNativeIsoHint          — soft note (Learning Mode only)
  */
 
 import { useState } from 'react'
@@ -45,6 +53,44 @@ interface RecommendationCardProps {
   /** Camera model name for explanation sheet header */
   cameraName?: string
   className?: string
+  /** Aperture was clamped to lens maximum — show amber note below aperture row */
+  apertureClampNote?: string | null
+  /** Shutter speed exceeds flash sync — show inline warning near shutter row */
+  flashSyncWarning?: string | null
+  /** Aperture may cause diffraction at chosen output size */
+  diffractionWarning?: string | null
+  /** IBIS focal length was estimated — soft informational prompt */
+  ibisEstimatedFocalLengthPrompt?: string | null
+  /** Combined IS cap reached — Learning Mode only */
+  stabilizationCapNote?: string | null
+  /** Dual-native ISO in use — Learning Mode only */
+  dualNativeIsoHint?: string | null
+}
+
+// ─── Shared inline helpers ────────────────────────────────────────────────────
+
+/** Amber warning box with triangle icon — used for shutterSpeedWarning and diffractionWarning. */
+function AmberWarningBox({ message }: { message: string }) {
+  return (
+    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-400">
+      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      <span>{message}</span>
+    </div>
+  )
+}
+
+/** Small amber text note rendered inline inside the settings grid. */
+function InlineAmberNote({ message }: { message: string }) {
+  return (
+    <p className="px-1 pb-1 text-xs text-amber-600 dark:text-amber-400">{message}</p>
+  )
+}
+
+/** Muted informational note — no warning role. */
+function SoftNote({ message }: { message: string }) {
+  return (
+    <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{message}</p>
+  )
 }
 
 // ─── Setting row ─────────────────────────────────────────────────────────────
@@ -93,6 +139,12 @@ export function RecommendationCard({
   shutterSpeedWarning,
   cameraName,
   className,
+  apertureClampNote,
+  flashSyncWarning,
+  diffractionWarning,
+  ibisEstimatedFocalLengthPrompt,
+  stabilizationCapNote,
+  dualNativeIsoHint,
 }: RecommendationCardProps) {
   const { mode } = useUIMode()
   const isRecommended = index === 0
@@ -156,18 +208,24 @@ export function RecommendationCard({
             clickable={isQuick && !!suggestion.explanation}
             onClick={() => openSheet('iso')}
           />
-          <SettingRow
-            label="Aperture"
-            value={`f/${suggestion.aperture.toFixed(1)}`}
-            clickable={isQuick && !!suggestion.explanation}
-            onClick={() => openSheet('aperture')}
-          />
-          <SettingRow
-            label="Shutter"
-            value={`${suggestion.shutter}s`}
-            clickable={isQuick && !!suggestion.explanation}
-            onClick={() => openSheet('shutter')}
-          />
+          <div>
+            <SettingRow
+              label="Aperture"
+              value={`f/${suggestion.aperture.toFixed(1)}`}
+              clickable={isQuick && !!suggestion.explanation}
+              onClick={() => openSheet('aperture')}
+            />
+            {apertureClampNote && <InlineAmberNote message={apertureClampNote} />}
+          </div>
+          <div>
+            <SettingRow
+              label="Shutter"
+              value={`${suggestion.shutter}s`}
+              clickable={isQuick && !!suggestion.explanation}
+              onClick={() => openSheet('shutter')}
+            />
+            {flashSyncWarning && <InlineAmberNote message={flashSyncWarning} />}
+          </div>
           <SettingRow
             label="White Balance"
             value={suggestion.whiteBalance}
@@ -182,13 +240,14 @@ export function RecommendationCard({
           />
         </div>
 
-        {/* ── IBIS / shutter warning ── */}
-        {shutterSpeedWarning && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-400">
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            <span>{shutterSpeedWarning}</span>
-          </div>
-        )}
+        {/* ── Card-level amber warning boxes ── */}
+        {shutterSpeedWarning && <AmberWarningBox message={shutterSpeedWarning} />}
+        {diffractionWarning && <AmberWarningBox message={diffractionWarning} />}
+
+        {/* ── Soft informational notes ── */}
+        {ibisEstimatedFocalLengthPrompt && <SoftNote message={ibisEstimatedFocalLengthPrompt} />}
+        {!isQuick && stabilizationCapNote && <SoftNote message={stabilizationCapNote} />}
+        {!isQuick && dualNativeIsoHint && <SoftNote message={dualNativeIsoHint} />}
 
         {/* ── Inline explanations (Learning Mode only) ── */}
         {!isQuick && suggestion.explanation && (
