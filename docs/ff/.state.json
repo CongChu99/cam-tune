@@ -15,7 +15,8 @@
     "DESIGN",
     "BEADS",
     "APERANT_INJECT",
-    "APERANT_MONITOR"
+    "APERANT_MONITOR",
+    "PR"
   ],
   "failedAttempts": 0,
   "beadsEpic": "cam-tune-y7i",
@@ -208,11 +209,17 @@
   "wikiUrl": "https://github.com/CongChu99/cam-tune/wiki",
   "wikiGitUrl": "https://github.com/CongChu99/cam-tune.wiki.git",
   "taskLoop": {
-    "currentTaskId": "cam-tune-y7i.8",
-    "currentTaskSlug": "api-lens-search-route",
-    "currentBranch": "feat/cam-tune-y7i.8-api-lens-search-route",
-    "subState": "REVIEWING",
-    "completedTasks": [],
+    "currentTaskId": null,
+    "currentTaskSlug": null,
+    "currentBranch": null,
+    "subState": null,
+    "completedTasks": [
+      {
+        "id": "cam-tune-y7i.8",
+        "pr": 26,
+        "mergedAt": "2026-03-25T02:38:15Z"
+      }
+    ],
     "failedTasks": []
   }
 }
