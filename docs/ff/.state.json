@@ -209,10 +209,10 @@
   "wikiUrl": "https://github.com/CongChu99/cam-tune/wiki",
   "wikiGitUrl": "https://github.com/CongChu99/cam-tune.wiki.git",
   "taskLoop": {
-    "currentTaskId": null,
-    "currentTaskSlug": null,
-    "currentBranch": null,
-    "subState": null,
+    "currentTaskId": "cam-tune-y7i.33",
+    "currentTaskSlug": "ui-recommendation-card-inline-warnings",
+    "currentBranch": "feat/cam-tune-y7i.33-ui-recommendation-card-inline-warnings",
+    "subState": "CODING",
     "completedTasks": [
       {
         "id": "cam-tune-y7i.8",
