@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { LocationContextBar } from '@/components/location-context-bar'
 import { ModeToggle } from '@/components/mode-toggle'
 import { RecommendationCard, type Suggestion } from '@/components/recommendation-card'
+import { ActiveLensIndicator } from '@/components/active-lens-indicator'
+import { LensPickerModal } from '@/components/lens-picker-modal'
 import { useUIMode } from '@/store/ui-mode'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -89,6 +91,10 @@ export default function MainPage() {
   // ── Active camera profile ────────────────────────────────────────────────
   const [activeCamera, setActiveCamera] = useState<CameraProfile | null>(null)
 
+  // ── Active lens ──────────────────────────────────────────────────────────
+  const [activeLens, setActiveLens] = useState<{ id: string; name: string } | null>(null)
+  const [showLensModal, setShowLensModal] = useState(false)
+
   // ── Geolocation for the recommend call ──────────────────────────────────
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
 
@@ -118,7 +124,7 @@ export default function MainPage() {
     localStorage.setItem(TOOLTIP_SEEN_KEY, '1')
   }
 
-  // Fetch active camera profile
+  // Fetch active camera profile and active lens
   useEffect(() => {
     fetch('/api/user/cameras')
       .then((r) => r.json())
@@ -129,6 +135,19 @@ export default function MainPage() {
       })
       .catch(() => {
         // Non-fatal: we'll show unknown camera
+      })
+
+    fetch('/api/lens-profiles?active=true')
+      .then((r) => r.json())
+      .then((data: { profiles?: Array<{ id: string; manufacturer: string; model: string; isActive: boolean }> }) => {
+        const profiles = data.profiles ?? []
+        const active = profiles.find((p) => p.isActive) ?? null
+        if (active) {
+          setActiveLens({ id: active.id, name: `${active.manufacturer} ${active.model}` })
+        }
+      })
+      .catch(() => {
+        // Non-fatal: lens is optional
       })
   }, [])
 
@@ -221,6 +240,10 @@ export default function MainPage() {
             >
               + Camera
             </Link>
+            <ActiveLensIndicator
+              activeLensName={activeLens?.name ?? null}
+              onLensClick={() => setShowLensModal(true)}
+            />
           </div>
 
           {/* Right side: mode toggle + auth */}
@@ -421,6 +444,17 @@ export default function MainPage() {
         <div className="h-16" aria-hidden="true" />
       </main>
 
+      {showLensModal && (
+        <LensPickerModal
+          onSelect={async (lens) => {
+            // activate the selected lens
+            await fetch(`/api/lens-profiles/${lens.id}/activate`, { method: 'PATCH' })
+            setActiveLens({ id: lens.id, name: lens.model })
+            setShowLensModal(false)
+          }}
+          onClose={() => setShowLensModal(false)}
+        />
+      )}
     </div>
   )
 }
