@@ -54,10 +54,14 @@ export async function POST(request: NextRequest) {
       source,
     } = body
 
-    // Validate required fields
-    if (!cameraProfileId || focalLengthMm === undefined || maxAperture === undefined || minAperture === undefined) {
+    // Validate required fields.
+    // For zoom lenses, focalLengthMinMm + focalLengthMaxMm substitute for focalLengthMm.
+    const hasFocalLength =
+      focalLengthMm !== undefined ||
+      (focalLengthMinMm !== undefined && focalLengthMaxMm !== undefined)
+    if (!cameraProfileId || !hasFocalLength || maxAperture === undefined || minAperture === undefined) {
       return NextResponse.json(
-        { error: 'cameraProfileId, focalLengthMm, maxAperture, and minAperture are required' },
+        { error: 'cameraProfileId, maxAperture, minAperture, and either focalLengthMm or focalLengthMinMm+focalLengthMaxMm are required' },
         { status: 400 }
       )
     }

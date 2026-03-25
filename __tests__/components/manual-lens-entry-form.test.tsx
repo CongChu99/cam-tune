@@ -428,3 +428,43 @@ describe('Cancel button', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 })
+
+// ─── API error surface ─────────────────────────────────────────────────────────
+
+describe('API error handling', () => {
+  it('shows error message when API returns non-ok response', async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: 'Bad request' }),
+    } as Response)
+
+    render(<ManualLensEntryForm {...defaultProps} />)
+
+    await userEvent.type(screen.getByLabelText(/focal length/i), '50')
+    await userEvent.type(screen.getByLabelText(/max aperture/i), '1.8')
+    await userEvent.click(screen.getByRole('button', { name: /save|submit/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    })
+  })
+})
+
+// ─── Mode switch clears errors ────────────────────────────────────────────────
+
+describe('Mode switch', () => {
+  it('clears validation errors when switching between prime and zoom', async () => {
+    render(<ManualLensEntryForm {...defaultProps} />)
+
+    // Trigger prime focal length error
+    await userEvent.type(screen.getByLabelText(/max aperture/i), '1.8')
+    await userEvent.click(screen.getByRole('button', { name: /save|submit/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/focal length is required/i)).toBeInTheDocument()
+    })
+
+    // Switch to zoom — error should be cleared
+    await userEvent.click(screen.getByRole('button', { name: /zoom/i }))
+    expect(screen.queryByText(/focal length is required/i)).not.toBeInTheDocument()
+  })
+})

@@ -96,6 +96,7 @@ export function ManualLensEntryForm({
   const [isStabilized, setIsStabilized] = useState(false);
   const [stabilizationStops, setStabilizationStops] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,11 +116,13 @@ export function ManualLensEntryForm({
     }
 
     setErrors({});
+    setSubmitError(null);
     setIsSubmitting(true);
 
     try {
       const ap = parseFloat(maxAperture);
-      const isStops = isStabilized ? parseFloat(stabilizationStops) || null : null;
+      const stopsVal = parseFloat(stabilizationStops);
+      const isStops = isStabilized && !isNaN(stopsVal) ? stopsVal : null;
 
       const focalLengthFields =
         mode === "prime"
@@ -151,6 +154,8 @@ export function ManualLensEntryForm({
 
       const data = await res.json();
       onSuccess(data.lensProfile);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to save lens profile");
     } finally {
       setIsSubmitting(false);
     }
@@ -162,14 +167,14 @@ export function ManualLensEntryForm({
       <div>
         <button
           type="button"
-          onClick={() => setMode("prime")}
+          onClick={() => { setMode("prime"); setErrors({}); }}
           aria-pressed={mode === "prime"}
         >
           Prime
         </button>
         <button
           type="button"
-          onClick={() => setMode("zoom")}
+          onClick={() => { setMode("zoom"); setErrors({}); }}
           aria-pressed={mode === "zoom"}
         >
           Zoom
@@ -253,6 +258,9 @@ export function ManualLensEntryForm({
           />
         </div>
       )}
+
+      {/* ── Submit error ── */}
+      {submitError && <p role="alert">{submitError}</p>}
 
       {/* ── Actions ── */}
       <div>
