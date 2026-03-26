@@ -65,6 +65,8 @@ interface RecommendationCardProps {
   stabilizationCapNote?: string | null
   /** Dual-native ISO in use — Learning Mode only */
   dualNativeIsoHint?: string | null
+  /** Whether the user has an active lens profile selected */
+  hasActiveLens?: boolean
 }
 
 // ─── Shared inline helpers ────────────────────────────────────────────────────
@@ -145,6 +147,7 @@ export function RecommendationCard({
   ibisEstimatedFocalLengthPrompt,
   stabilizationCapNote,
   dualNativeIsoHint,
+  hasActiveLens,
 }: RecommendationCardProps) {
   const { mode } = useUIMode()
   const isRecommended = index === 0
@@ -243,6 +246,14 @@ export function RecommendationCard({
         {/* ── Card-level amber warning boxes ── */}
         {shutterSpeedWarning && <AmberWarningBox message={shutterSpeedWarning} />}
         {diffractionWarning && <AmberWarningBox message={diffractionWarning} />}
+
+        {/* ── No lens profile notice ── */}
+        {hasActiveLens === false && (
+          <>
+            <AmberWarningBox message="Estimated — lens profile missing" />
+            <SoftNote message="Accuracy improves with your lens profile" />
+          </>
+        )}
 
         {/* ── Soft informational notes ── */}
         {ibisEstimatedFocalLengthPrompt && <SoftNote message={ibisEstimatedFocalLengthPrompt} />}
