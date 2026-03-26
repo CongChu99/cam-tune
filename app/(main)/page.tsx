@@ -93,6 +93,7 @@ export default function MainPage() {
 
   // ── Active lens ──────────────────────────────────────────────────────────
   const [activeLens, setActiveLens] = useState<{ id: string; name: string } | null>(null)
+  const [currentFocalLengthMm, setCurrentFocalLengthMm] = useState<number | null>(null)
   const [showLensModal, setShowLensModal] = useState(false)
 
   // ── Geolocation for the recommend call ──────────────────────────────────
@@ -450,7 +451,9 @@ export default function MainPage() {
             // activate the selected lens
             await fetch(`/api/lens-profiles/${lens.id}/activate`, { method: 'PATCH' })
             setActiveLens({ id: lens.id, name: lens.model })
+            setCurrentFocalLengthMm(null)
             setShowLensModal(false)
+            handleGetRecommendation()
           }}
           onClose={() => setShowLensModal(false)}
         />
