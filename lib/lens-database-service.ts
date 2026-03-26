@@ -126,3 +126,57 @@ export async function getByLensfunId(lensfunId: string) {
     where: { lensfunId },
   })
 }
+
+/**
+ * Fuzzy-matches a raw EXIF lens model string against the LensfunLens table.
+ * Uses Levenshtein similarity — if best match confidence >= CONFIDENCE_THRESHOLD,
+ * returns { lens, confidence }. Otherwise logs the string to lens_exif_unmatched and returns null.
+ *
+ * @param lensModelString  Raw EXIF LensModel string (e.g. "Canon EF 50mm f/1.4 USM")
+ * @param userId           ID of the user whose EXIF string was unmatched (for logging)
+ */
+export async function matchExif(
+  lensModelString: string,
+  userId: string
+): Promise<{ lens: { id: string; lensfunId: string; manufacturer: string; model: string; focalLengthMinMm: number; focalLengthMaxMm: number; maxAperture: number; lensType: string; popularityWeight: number }, confidence: number } | null> {
+  // Empty input — return null immediately
+  if (!lensModelString.trim()) return null
+
+  const { default: prisma } = await import('./prisma')
+
+  // Fetch all lenses for comparison
+  const lenses = await prisma.lensfunLens.findMany()
+
+  if (lenses.length === 0) {
+    await prisma.lensExifUnmatched.create({
+      data: { rawLensModelString: lensModelString, userId },
+    })
+    return null
+  }
+
+  // Find best match by Levenshtein confidence
+  let bestLens = lenses[0]
+  let bestConfidence = computeConfidence(
+    lensModelString,
+    `${lenses[0].manufacturer} ${lenses[0].model}`
+  )
+
+  for (let i = 1; i < lenses.length; i++) {
+    const lens = lenses[i]
+    const conf = computeConfidence(lensModelString, `${lens.manufacturer} ${lens.model}`)
+    if (conf > bestConfidence) {
+      bestConfidence = conf
+      bestLens = lens
+    }
+  }
+
+  if (bestConfidence >= CONFIDENCE_THRESHOLD) {
+    return { lens: bestLens, confidence: bestConfidence }
+  }
+
+  // Below threshold — log and return null
+  await prisma.lensExifUnmatched.create({
+    data: { rawLensModelString: lensModelString, userId },
+  })
+  return null
+}
