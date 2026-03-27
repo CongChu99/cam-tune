@@ -207,10 +207,86 @@ void main() {
       expect(result, isFalse);
     });
 
-    test('returns true when access token stored', () async {
+    test('returns true when access token stored with no expiry', () async {
       await mockStorage.write(key: 'access_token', value: 'some-token');
       final result = await authService.isLoggedIn();
       expect(result, isTrue);
+    });
+
+    test('returns true when access token stored and not yet expired', () async {
+      final future = DateTime.now().add(const Duration(hours: 1));
+      await mockStorage.write(key: 'access_token', value: 'some-token');
+      await mockStorage.write(
+          key: 'auth_token_expiry', value: future.toIso8601String());
+      final result = await authService.isLoggedIn();
+      expect(result, isTrue);
+    });
+
+    test('returns false when token is expired', () async {
+      final past = DateTime.now().subtract(const Duration(seconds: 1));
+      await mockStorage.write(key: 'access_token', value: 'some-token');
+      await mockStorage.write(
+          key: 'auth_token_expiry', value: past.toIso8601String());
+      final result = await authService.isLoggedIn();
+      expect(result, isFalse);
+    });
+
+    test('returns false when token is empty string', () async {
+      await mockStorage.write(key: 'access_token', value: '');
+      final result = await authService.isLoggedIn();
+      expect(result, isFalse);
+    });
+  });
+
+  group('AuthService.login() client ID guard', () {
+    test('throws when clientId is empty (AuthException in release, AssertionError in debug)',
+        () async {
+      final serviceNoClientId = AuthService(
+        appAuth: mockAppAuth,
+        secureStorage: mockStorage,
+        clientId: '',
+      );
+      // In debug mode the assert fires (AssertionError); in release the
+      // if-throw fires (AuthException). Either way login() must not succeed.
+      await expectLater(
+        () => serviceNoClientId.login(),
+        throwsA(isA<Object>()),
+      );
+    });
+  });
+
+  group('AuthService.logout() targeted deletes', () {
+    test('clears expiry key on logout', () async {
+      await mockStorage.write(key: 'auth_token_expiry', value: 'some-date');
+      await authService.logout();
+      final stored = await mockStorage.read(key: 'auth_token_expiry');
+      expect(stored, isNull);
+    });
+
+    test('clears id_token key on logout', () async {
+      await mockStorage.write(key: 'id_token', value: 'some-id-token');
+      await authService.logout();
+      final stored = await mockStorage.read(key: 'id_token');
+      expect(stored, isNull);
+    });
+
+    test('does not clear unrelated keys', () async {
+      await mockStorage.write(key: 'unrelated_key', value: 'keep-me');
+      await mockStorage.write(key: 'access_token', value: 'token');
+      await authService.logout();
+      final unrelated = await mockStorage.read(key: 'unrelated_key');
+      expect(unrelated, equals('keep-me'));
+    });
+  });
+
+  group('AuthService._storeTokens() stores expiry', () {
+    test('stores expiry timestamp after login', () async {
+      await authService.login();
+      final stored = await mockStorage.read(key: 'auth_token_expiry');
+      expect(stored, isNotNull);
+      final parsed = DateTime.tryParse(stored!);
+      expect(parsed, isNotNull);
+      expect(parsed!.isAfter(DateTime.now()), isTrue);
     });
   });
 }

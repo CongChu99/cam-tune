@@ -36,6 +36,7 @@ class AuthRouterNotifier extends ChangeNotifier {
 /// - /recommendation → [RecommendationScreen]
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = AuthRouterNotifier(ref);
+  ref.onDispose(notifier.dispose);
 
   return GoRouter(
     initialLocation: '/login',

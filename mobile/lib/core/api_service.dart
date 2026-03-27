@@ -84,17 +84,23 @@ class AuthInterceptor extends Interceptor {
   /// in-flight [Completer] so only one refresh request goes out at a time.
   Future<void> _doRefresh() async {
     if (_refreshCompleter != null) {
-      return _refreshCompleter!.future;
+      await _refreshCompleter!.future;
+      return;
     }
-    _refreshCompleter = Completer<void>();
+    final completer = Completer<void>();
+    _refreshCompleter = completer;
     try {
       await _authService.refreshToken();
-      _refreshCompleter!.complete();
+      completer.complete();
     } catch (e) {
-      _refreshCompleter!.completeError(e);
+      completer.completeError(e);
       rethrow;
     } finally {
-      _refreshCompleter = null;
+      // Only reset if we're still the current completer (guards against
+      // races where a new refresh started before finally ran).
+      if (identical(_refreshCompleter, completer)) {
+        _refreshCompleter = null;
+      }
     }
   }
 }

@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'auth_notifier.dart';
 
 /// Login screen showing "Sign in with Google" button.
@@ -23,15 +22,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
 
-    // Listen for auth state changes and navigate to home when authenticated.
+    // Listen for auth state changes; navigation to /home is handled by
+    // routerProvider redirect — do NOT call context.go here to avoid
+    // dual-navigation.
     ref.listen<AuthState>(authNotifierProvider, (previous, next) {
-      if (next.isAuthenticated) {
-        context.go('/home');
-      }
-      // Reset signing-in flag when we reach a terminal state.
-      if (next != const AuthState.loading()) {
-        if (mounted) {
-          setState(() => _isSigningIn = false);
+      if (next == const AuthState.loading()) {
+        // Still loading — nothing to do.
+      } else if (next.isAuthenticated) {
+        // Navigation handled by routerProvider redirect.
+        if (mounted) setState(() => _isSigningIn = false);
+      } else {
+        // Unauthenticated — reset flag and show error if present.
+        if (mounted) setState(() => _isSigningIn = false);
+        final errorMessage = next.errorMessage;
+        if (errorMessage != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage)),
+          );
         }
       }
     });

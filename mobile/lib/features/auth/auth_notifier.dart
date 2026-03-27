@@ -24,6 +24,13 @@ sealed class AuthState {
     if (self is _AuthAuthenticated) return self.accessToken;
     return null;
   }
+
+  /// Returns the error message if unauthenticated with an error, otherwise null.
+  String? get errorMessage {
+    final self = this;
+    if (self is _AuthUnauthenticated) return self.errorMessage;
+    return null;
+  }
 }
 
 /// Loading state: app is checking stored tokens.
@@ -55,12 +62,13 @@ final class _AuthAuthenticated extends AuthState {
   int get hashCode => Object.hash(runtimeType, accessToken);
 
   @override
-  String toString() => 'AuthState.authenticated($accessToken)';
+  String toString() => 'AuthState.authenticated([REDACTED])';
 }
 
 /// Unauthenticated state: user has no valid token.
 /// [errorMessage] is optionally set when unauthenticated due to a login failure.
 final class _AuthUnauthenticated extends AuthState {
+  @override
   final String? errorMessage;
 
   const _AuthUnauthenticated({this.errorMessage});

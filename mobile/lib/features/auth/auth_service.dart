@@ -20,6 +20,7 @@ const List<String> _kScopes = ['openid', 'email', 'profile', 'offline_access'];
 const String _kAccessTokenKey = 'access_token';
 const String _kRefreshTokenKey = 'refresh_token';
 const String _kIdTokenKey = 'id_token';
+const String _kTokenExpiryKey = 'auth_token_expiry';
 
 // ─── Exceptions ─────────────────────────────────────────────────────────────
 
@@ -192,6 +193,10 @@ class AuthService implements AuthServiceInterface {
   Future<void> login() async {
     assert(_clientId.isNotEmpty,
         'GOOGLE_CLIENT_ID must be set via --dart-define=GOOGLE_CLIENT_ID=<value>');
+    if (_clientId.isEmpty) {
+      throw const AuthException(
+          'GOOGLE_CLIENT_ID is not configured. Set it via --dart-define=GOOGLE_CLIENT_ID=<value>');
+    }
     try {
       final response = await _appAuth.authorizeAndExchangeCode(
         clientId: _clientId,
@@ -213,7 +218,10 @@ class AuthService implements AuthServiceInterface {
   /// Clears all auth tokens from secure storage.
   @override
   Future<void> logout() async {
-    await _secureStorage.deleteAll();
+    await _secureStorage.delete(key: _kAccessTokenKey);
+    await _secureStorage.delete(key: _kRefreshTokenKey);
+    await _secureStorage.delete(key: _kIdTokenKey);
+    await _secureStorage.delete(key: _kTokenExpiryKey);
   }
 
   /// Returns the stored access token, or null if not logged in.
@@ -252,11 +260,17 @@ class AuthService implements AuthServiceInterface {
     }
   }
 
-  /// Returns true if an access token is present in secure storage.
+  /// Returns true if an access token is present and not expired.
   @override
   Future<bool> isLoggedIn() async {
     final token = await _secureStorage.read(key: _kAccessTokenKey);
-    return token != null;
+    if (token == null || token.isEmpty) return false;
+    final expiryStr = await _secureStorage.read(key: _kTokenExpiryKey);
+    if (expiryStr != null) {
+      final expiry = DateTime.tryParse(expiryStr);
+      if (expiry != null && DateTime.now().isAfter(expiry)) return false;
+    }
+    return true;
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────
@@ -268,6 +282,12 @@ class AuthService implements AuthServiceInterface {
         key: _kRefreshTokenKey, value: response.refreshToken);
     if (response.idToken != null) {
       await _secureStorage.write(key: _kIdTokenKey, value: response.idToken);
+    }
+    if (response.accessTokenExpirationDateTime != null) {
+      await _secureStorage.write(
+        key: _kTokenExpiryKey,
+        value: response.accessTokenExpirationDateTime!.toIso8601String(),
+      );
     }
   }
 }
