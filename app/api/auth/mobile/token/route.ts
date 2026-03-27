@@ -16,10 +16,51 @@ import {
   ACCESS_EXPIRES_IN,
 } from "@/lib/mobile-jwt";
 
+/** Simple in-memory rate limiter: max 5 attempts per IP per 15 minutes. */
+export const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in ms
+const RATE_LIMIT_RETRY_AFTER = 900; // seconds
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now >= entry.resetAt) {
+    // First request in this window or previous window has expired
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return true;
+  }
+
+  entry.count += 1;
+  return false;
+}
+
 export async function POST(request: Request) {
   try {
+    // Rate limiting
+    const ip =
+      request.headers.get("x-forwarded-for") ??
+      request.headers.get("x-real-ip") ??
+      "unknown";
+
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { error: "too_many_requests", retryAfter: RATE_LIMIT_RETRY_AFTER },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, password } = body ?? {};
+
+    if (typeof email !== "string" || typeof password !== "string") {
+      return NextResponse.json({ error: "missing_fields" }, { status: 400 });
+    }
 
     if (!email || !password) {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });

@@ -26,7 +26,7 @@ vi.mock('bcryptjs', () => ({
 
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { POST as tokenPOST } from '../../../app/api/auth/mobile/token/route'
+import { POST as tokenPOST, rateLimitMap } from '../../../app/api/auth/mobile/token/route'
 import { POST as refreshPOST } from '../../../app/api/auth/mobile/refresh/route'
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../../lib/mobile-jwt'
 
@@ -39,10 +39,10 @@ const mockUser = {
   passwordHash: '$2a$10$hashedpassword',
 }
 
-function makeJsonRequest(url: string, body: Record<string, unknown>) {
+function makeJsonRequest(url: string, body: Record<string, unknown>, headers?: Record<string, string>) {
   return new Request(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   }) as any
 }
@@ -50,6 +50,7 @@ function makeJsonRequest(url: string, body: Record<string, unknown>) {
 describe('lib/mobile-jwt helpers', () => {
   beforeEach(() => {
     process.env.NEXTAUTH_SECRET = TEST_SECRET
+    delete process.env.MOBILE_JWT_SECRET
   })
 
   it('signAccessToken returns a JWT string', async () => {
@@ -90,12 +91,34 @@ describe('lib/mobile-jwt helpers', () => {
     const ttlSeconds = payload.exp - payload.iat
     expect(ttlSeconds).toBe(30 * 24 * 60 * 60)
   })
+
+  it('access token has type claim "access"', async () => {
+    const token = await signAccessToken('user-123', 'user@example.com')
+    const payloadB64 = token.split('.')[1]
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
+    expect(payload.type).toBe('access')
+  })
+
+  it('refresh token has type claim "refresh"', async () => {
+    const token = await signRefreshToken('user-123')
+    const payloadB64 = token.split('.')[1]
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
+    expect(payload.type).toBe('refresh')
+  })
+
+  it('verifyRefreshToken throws when access token is submitted as refresh token', async () => {
+    const accessToken = await signAccessToken('user-123', 'user@example.com')
+    await expect(verifyRefreshToken(accessToken)).rejects.toThrow()
+  })
 })
 
 describe('POST /api/auth/mobile/token', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.NEXTAUTH_SECRET = TEST_SECRET
+    delete process.env.MOBILE_JWT_SECRET
+    // Reset rate limiter state between tests
+    rateLimitMap.clear()
   })
 
   it('returns 400 { error: "missing_fields" } when email is missing', async () => {
@@ -122,6 +145,30 @@ describe('POST /api/auth/mobile/token', () => {
 
   it('returns 400 { error: "missing_fields" } when both fields are missing', async () => {
     const req = makeJsonRequest('http://localhost/api/auth/mobile/token', {})
+    const res = await tokenPOST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data.error).toBe('missing_fields')
+  })
+
+  it('returns 400 { error: "missing_fields" } when email is not a string', async () => {
+    const req = makeJsonRequest('http://localhost/api/auth/mobile/token', {
+      email: 123,
+      password: 'somepassword',
+    })
+    const res = await tokenPOST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data.error).toBe('missing_fields')
+  })
+
+  it('returns 400 { error: "missing_fields" } when password is not a string', async () => {
+    const req = makeJsonRequest('http://localhost/api/auth/mobile/token', {
+      email: 'user@example.com',
+      password: true,
+    })
     const res = await tokenPOST(req)
     const data = await res.json()
 
@@ -225,12 +272,41 @@ describe('POST /api/auth/mobile/token', () => {
 
     expect(payload.sub).toBe(mockUser.id)
   })
+
+  it('returns 429 { error: "too_many_requests" } after 5 attempts from same IP', async () => {
+    ;(prisma.user.findUnique as any).mockResolvedValue(null)
+
+    const testIp = '10.0.0.1'
+    // Make 5 attempts (all fail with 401 — user not found)
+    for (let i = 0; i < 5; i++) {
+      const req = makeJsonRequest(
+        'http://localhost/api/auth/mobile/token',
+        { email: 'a@example.com', password: 'pass' },
+        { 'x-forwarded-for': testIp }
+      )
+      await tokenPOST(req)
+    }
+
+    // 6th attempt should be rate-limited
+    const req = makeJsonRequest(
+      'http://localhost/api/auth/mobile/token',
+      { email: 'a@example.com', password: 'pass' },
+      { 'x-forwarded-for': testIp }
+    )
+    const res = await tokenPOST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(429)
+    expect(data.error).toBe('too_many_requests')
+    expect(data.retryAfter).toBe(900)
+  })
 })
 
 describe('POST /api/auth/mobile/refresh', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.NEXTAUTH_SECRET = TEST_SECRET
+    delete process.env.MOBILE_JWT_SECRET
   })
 
   it('returns 400 { error: "missing_fields" } when refreshToken is missing', async () => {
@@ -274,7 +350,20 @@ describe('POST /api/auth/mobile/refresh', () => {
     expect(data.error).toBe('refresh_token_expired')
   })
 
-  it('returns 200 with new { accessToken, expiresIn } on valid refresh token', async () => {
+  it('returns 401 when access token is submitted to refresh endpoint (token type confusion)', async () => {
+    const accessToken = await signAccessToken(mockUser.id, mockUser.email)
+
+    const req = makeJsonRequest('http://localhost/api/auth/mobile/refresh', {
+      refreshToken: accessToken,
+    })
+    const res = await refreshPOST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(401)
+    expect(data.error).toBe('refresh_token_expired')
+  })
+
+  it('returns 200 with new { accessToken, refreshToken, expiresIn } on valid refresh token', async () => {
     ;(prisma.user.findUnique as any).mockResolvedValue(mockUser)
     const validRefreshToken = await signRefreshToken(mockUser.id)
 
@@ -286,6 +375,7 @@ describe('POST /api/auth/mobile/refresh', () => {
 
     expect(res.status).toBe(200)
     expect(typeof data.accessToken).toBe('string')
+    expect(typeof data.refreshToken).toBe('string')
     expect(data.expiresIn).toBe(15 * 60)
   })
 
@@ -302,6 +392,27 @@ describe('POST /api/auth/mobile/refresh', () => {
     const payloadB64 = data.accessToken.split('.')[1]
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
 
+    expect(payload.sub).toBe(mockUser.id)
+  })
+
+  it('refresh response includes a new refresh token with correct type and sub (rotation)', async () => {
+    ;(prisma.user.findUnique as any).mockResolvedValue(mockUser)
+    const originalRefreshToken = await signRefreshToken(mockUser.id)
+
+    const req = makeJsonRequest('http://localhost/api/auth/mobile/refresh', {
+      refreshToken: originalRefreshToken,
+    })
+    const res = await refreshPOST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(typeof data.refreshToken).toBe('string')
+    expect(data.refreshToken.split('.')).toHaveLength(3)
+
+    // Verify the returned refresh token is a valid refresh token with correct claims
+    const payloadB64 = data.refreshToken.split('.')[1]
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
+    expect(payload.type).toBe('refresh')
     expect(payload.sub).toBe(mockUser.id)
   })
 
