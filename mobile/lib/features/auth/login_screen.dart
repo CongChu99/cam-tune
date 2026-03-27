@@ -20,8 +20,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authNotifierProvider);
-
     // Listen for auth state changes; navigation to /home is handled by
     // routerProvider redirect — do NOT call context.go here to avoid
     // dual-navigation.
@@ -44,8 +42,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     // Show loading overlay only when the user is actively signing in.
-    final showLoading = _isSigningIn ||
-        (authState == const AuthState.loading() && _isSigningIn);
+    final showLoading = _isSigningIn;
 
     return Scaffold(
       body: Center(

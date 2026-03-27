@@ -59,6 +59,16 @@ class AuthInterceptor extends Interceptor {
       return handler.next(err);
     }
 
+    // Guard against infinite retry loops: if this request was already retried
+    // once (after a token refresh), do not retry again — just log out.
+    if (err.requestOptions.extra['_retried'] == true) {
+      await _authNotifier.logout();
+      return handler.next(err);
+    }
+
+    // Mark the request as retried before attempting refresh + retry.
+    err.requestOptions.extra['_retried'] = true;
+
     try {
       // Serialize concurrent 401s: if a refresh is already in flight,
       // await it instead of starting a second one.
