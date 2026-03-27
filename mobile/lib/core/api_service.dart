@@ -1,6 +1,8 @@
 // api_service.dart
 // ApiService: Dio HTTP client with Bearer token injection and 401 auto-refresh.
 
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/auth_service.dart';
@@ -23,8 +25,9 @@ class AuthInterceptor extends Interceptor {
   final AuthNotifier _authNotifier;
   final Dio _dio;
 
-  // Guard flag to prevent infinite retry loops.
-  bool _isRefreshing = false;
+  // Completer-based queue to serialize concurrent 401 refresh attempts.
+  // Concurrent 401s await the in-flight refresh rather than racing.
+  Completer<void>? _refreshCompleter;
 
   AuthInterceptor({
     required AuthServiceInterface authService,
@@ -52,14 +55,14 @@ class AuthInterceptor extends Interceptor {
     ErrorInterceptorHandler handler,
   ) async {
     // Only handle 401 Unauthorized.
-    if (err.response?.statusCode != 401 || _isRefreshing) {
+    if (err.response?.statusCode != 401) {
       return handler.next(err);
     }
 
-    _isRefreshing = true;
     try {
-      // Attempt to refresh the access token.
-      await _authService.refreshToken();
+      // Serialize concurrent 401s: if a refresh is already in flight,
+      // await it instead of starting a second one.
+      await _doRefresh();
 
       // Retry the original request with the new token.
       final newToken = await _authService.getAccessToken();
@@ -69,13 +72,29 @@ class AuthInterceptor extends Interceptor {
       }
 
       final response = await _dio.fetch(retryOptions);
-      _isRefreshing = false;
       return handler.resolve(response);
     } catch (_) {
       // Refresh token is expired — force re-login.
-      _isRefreshing = false;
       await _authNotifier.logout();
       return handler.next(err);
+    }
+  }
+
+  /// Performs a token refresh, queuing any concurrent callers behind a single
+  /// in-flight [Completer] so only one refresh request goes out at a time.
+  Future<void> _doRefresh() async {
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+    _refreshCompleter = Completer<void>();
+    try {
+      await _authService.refreshToken();
+      _refreshCompleter!.complete();
+    } catch (e) {
+      _refreshCompleter!.completeError(e);
+      rethrow;
+    } finally {
+      _refreshCompleter = null;
     }
   }
 }

@@ -102,7 +102,10 @@ void main() {
 
       await notifier.login();
 
-      expect(notifier.state, equals(const AuthState.unauthenticated()));
+      // After a failed login, state is unauthenticated and carries an error message.
+      expect(notifier.state.isAuthenticated, isFalse);
+      expect(notifier.state,
+          equals(const AuthState.unauthenticated(errorMessage: 'AuthException: Login failed')));
     });
   });
 

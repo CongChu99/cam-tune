@@ -101,6 +101,7 @@ void main() {
     authService = AuthService(
       appAuth: mockAppAuth,
       secureStorage: mockStorage,
+      clientId: 'test-client-id',
     );
   });
 

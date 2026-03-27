@@ -8,7 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const String _kClientId = 'your-google-client-id';
+const String _kClientId = String.fromEnvironment(
+  'GOOGLE_CLIENT_ID',
+  defaultValue: '',
+);
 const String _kRedirectUrl = 'com.camtune.app:/oauth2redirect';
 const String _kDiscoveryUrl =
     'https://accounts.google.com/.well-known/openid-configuration';
@@ -167,23 +170,31 @@ class FlutterSecureStorageAdapter implements SecureStorageInterface {
 /// Handles PKCE OAuth flow, token storage, and token refresh.
 ///
 /// Dependencies injected via constructor for testability.
+/// [clientId] defaults to [_kClientId] (injected at build time via
+/// `--dart-define=GOOGLE_CLIENT_ID=<value>`). Pass a non-empty value in tests
+/// to satisfy the debug-mode assertion without requiring a build-time define.
 class AuthService implements AuthServiceInterface {
   final FlutterAppAuthInterface _appAuth;
   final SecureStorageInterface _secureStorage;
+  final String _clientId;
 
   AuthService({
     required FlutterAppAuthInterface appAuth,
     required SecureStorageInterface secureStorage,
+    String clientId = _kClientId,
   })  : _appAuth = appAuth,
-        _secureStorage = secureStorage;
+        _secureStorage = secureStorage,
+        _clientId = clientId;
 
   /// Initiates PKCE login flow via flutter_appauth.
   /// Stores accessToken and refreshToken to secure storage on success.
   @override
   Future<void> login() async {
+    assert(_clientId.isNotEmpty,
+        'GOOGLE_CLIENT_ID must be set via --dart-define=GOOGLE_CLIENT_ID=<value>');
     try {
       final response = await _appAuth.authorizeAndExchangeCode(
-        clientId: _kClientId,
+        clientId: _clientId,
         redirectUrl: _kRedirectUrl,
         scopes: _kScopes,
         discoveryUrl: _kDiscoveryUrl,
@@ -224,7 +235,7 @@ class AuthService implements AuthServiceInterface {
 
     try {
       final response = await _appAuth.refreshToken(
-        clientId: _kClientId,
+        clientId: _clientId,
         redirectUrl: _kRedirectUrl,
         scopes: _kScopes,
         discoveryUrl: _kDiscoveryUrl,

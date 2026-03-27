@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,21 +8,40 @@ import '../features/home/home_screen.dart';
 import '../features/cameras/cameras_screen.dart';
 import '../features/recommendation/recommendation_screen.dart';
 
-/// Top-level [GoRouter] instance for CamTune Mobile.
+// ─── AuthRouterNotifier ──────────────────────────────────────────────────────
+
+/// A [ChangeNotifier] that bridges Riverpod auth state changes to GoRouter's
+/// [refreshListenable], so redirect logic re-evaluates on every auth change.
+class AuthRouterNotifier extends ChangeNotifier {
+  AuthRouterNotifier(this._ref) {
+    _ref.listen<AuthState>(authNotifierProvider, (_, __) => notifyListeners());
+  }
+
+  final Ref _ref;
+}
+
+// ─── routerProvider ──────────────────────────────────────────────────────────
+
+/// Riverpod provider that creates and owns the [GoRouter] instance.
+///
+/// Using a provider ensures:
+/// 1. The router is reactive — auth state changes trigger redirect re-evaluation
+///    via [AuthRouterNotifier] + [GoRouter.refreshListenable].
+/// 2. There is a single source of truth for the router (no dead global).
 ///
 /// Routes:
 /// - /login         → [LoginScreen]
 /// - /home          → [HomeScreen]
 /// - /cameras       → [CamerasScreen]
 /// - /recommendation → [RecommendationScreen]
-///
-/// Redirect logic: unauthenticated users are redirected to /login.
-/// Uses [authNotifierProvider] to check authentication state.
-GoRouter createAppRouter(ProviderContainer container) {
+final routerProvider = Provider<GoRouter>((ref) {
+  final notifier = AuthRouterNotifier(ref);
+
   return GoRouter(
     initialLocation: '/login',
+    refreshListenable: notifier,
     redirect: (context, state) {
-      final authState = container.read(authNotifierProvider);
+      final authState = ref.read(authNotifierProvider);
       final isLoading = authState == const AuthState.loading();
       final isAuthenticated = authState.isAuthenticated;
       final isOnLogin = state.matchedLocation == '/login';
@@ -56,33 +76,4 @@ GoRouter createAppRouter(ProviderContainer container) {
       ),
     ],
   );
-}
-
-/// Default app router using the global Riverpod container.
-/// For use in [CamTuneApp]; can be replaced in tests.
-final GoRouter appRouter = GoRouter(
-  initialLocation: '/login',
-  redirect: (context, state) {
-    // Auth redirect is handled by listening to authNotifierProvider
-    // in individual screens (e.g., LoginScreen navigates on auth change).
-    return null;
-  },
-  routes: [
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
-    GoRoute(
-      path: '/home',
-      builder: (context, state) => const HomeScreen(),
-    ),
-    GoRoute(
-      path: '/cameras',
-      builder: (context, state) => const CamerasScreen(),
-    ),
-    GoRoute(
-      path: '/recommendation',
-      builder: (context, state) => const RecommendationScreen(),
-    ),
-  ],
-);
+});

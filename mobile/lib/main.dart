@@ -21,18 +21,22 @@ Future<void> main() async {
 ///
 /// Wrapped externally by [ProviderScope] in [main] so that Riverpod
 /// providers are available throughout the widget tree.
-class CamTuneApp extends StatelessWidget {
+///
+/// Uses [ConsumerWidget] to read [routerProvider] — the reactive GoRouter
+/// instance that includes auth-guard redirect logic.
+class CamTuneApp extends ConsumerWidget {
   const CamTuneApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'CamTune',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
         useMaterial3: true,
       ),
-      routerConfig: appRouter,
+      routerConfig: router,
     );
   }
 }

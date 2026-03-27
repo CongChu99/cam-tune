@@ -8,33 +8,65 @@ import 'package:go_router/go_router.dart';
 
 import 'package:cam_tune_mobile/main.dart';
 import 'package:cam_tune_mobile/core/router.dart';
+import 'package:cam_tune_mobile/features/auth/auth_service.dart';
+
+// ─── Minimal mock for ProviderContainer tests ────────────────────────────────
+
+class _FakeAuthService implements AuthServiceInterface {
+  @override
+  Future<void> login() async {}
+  @override
+  Future<void> logout() async {}
+  @override
+  Future<String?> getAccessToken() async => null;
+  @override
+  Future<void> refreshToken() async {}
+  @override
+  Future<bool> isLoggedIn() async => false;
+}
 
 void main() {
   group('Scaffold: router.dart', () {
-    test('router export: appRouter is a GoRouter instance', () {
-      expect(appRouter, isA<GoRouter>());
+    late ProviderContainer container;
+    late GoRouter router;
+
+    setUp(() {
+      container = ProviderContainer(
+        overrides: [
+          authServiceProvider.overrideWithValue(_FakeAuthService()),
+        ],
+      );
+      router = container.read(routerProvider);
+    });
+
+    tearDown(() {
+      container.dispose();
+    });
+
+    test('routerProvider returns a GoRouter instance', () {
+      expect(router, isA<GoRouter>());
     });
 
     test('router has /login route', () {
-      final routes = appRouter.configuration.routes;
+      final routes = router.configuration.routes;
       final paths = _collectPaths(routes);
       expect(paths, contains('/login'));
     });
 
     test('router has /home route', () {
-      final routes = appRouter.configuration.routes;
+      final routes = router.configuration.routes;
       final paths = _collectPaths(routes);
       expect(paths, contains('/home'));
     });
 
     test('router has /cameras route', () {
-      final routes = appRouter.configuration.routes;
+      final routes = router.configuration.routes;
       final paths = _collectPaths(routes);
       expect(paths, contains('/cameras'));
     });
 
     test('router has /recommendation route', () {
-      final routes = appRouter.configuration.routes;
+      final routes = router.configuration.routes;
       final paths = _collectPaths(routes);
       expect(paths, contains('/recommendation'));
     });

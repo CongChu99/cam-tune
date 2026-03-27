@@ -12,7 +12,8 @@ sealed class AuthState {
 
   const factory AuthState.loading() = _AuthLoading;
   const factory AuthState.authenticated(String accessToken) = _AuthAuthenticated;
-  const factory AuthState.unauthenticated() = _AuthUnauthenticated;
+  const factory AuthState.unauthenticated({String? errorMessage}) =
+      _AuthUnauthenticated;
 
   /// Returns true if the state is authenticated.
   bool get isAuthenticated => this is _AuthAuthenticated;
@@ -58,17 +59,21 @@ final class _AuthAuthenticated extends AuthState {
 }
 
 /// Unauthenticated state: user has no valid token.
+/// [errorMessage] is optionally set when unauthenticated due to a login failure.
 final class _AuthUnauthenticated extends AuthState {
-  const _AuthUnauthenticated();
+  final String? errorMessage;
+
+  const _AuthUnauthenticated({this.errorMessage});
 
   @override
-  bool operator ==(Object other) => other is _AuthUnauthenticated;
+  bool operator ==(Object other) =>
+      other is _AuthUnauthenticated && other.errorMessage == errorMessage;
 
   @override
-  int get hashCode => runtimeType.hashCode;
+  int get hashCode => Object.hash(runtimeType, errorMessage);
 
   @override
-  String toString() => 'AuthState.unauthenticated()';
+  String toString() => 'AuthState.unauthenticated(errorMessage: $errorMessage)';
 }
 
 // ─── AuthNotifier ────────────────────────────────────────────────────────────
@@ -91,7 +96,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final loggedIn = await _authService.isLoggedIn();
       if (loggedIn) {
         final token = await _authService.getAccessToken();
-        state = AuthState.authenticated(token ?? '');
+        if (token != null) {
+          state = AuthState.authenticated(token);
+        } else {
+          state = const AuthState.unauthenticated();
+        }
       } else {
         state = const AuthState.unauthenticated();
       }
@@ -102,15 +111,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Initiates PKCE login flow.
   /// On success: state becomes [AuthState.authenticated].
-  /// On failure: state becomes [AuthState.unauthenticated].
+  /// On failure: state becomes [AuthState.unauthenticated] with [errorMessage].
   Future<void> login() async {
     state = const AuthState.loading();
     try {
       await _authService.login();
       final token = await _authService.getAccessToken();
-      state = AuthState.authenticated(token ?? '');
-    } catch (_) {
-      state = const AuthState.unauthenticated();
+      if (token != null) {
+        state = AuthState.authenticated(token);
+      } else {
+        state = const AuthState.unauthenticated(
+            errorMessage: 'Login succeeded but no access token was returned');
+      }
+    } catch (e) {
+      state = AuthState.unauthenticated(errorMessage: e.toString());
     }
   }
 
