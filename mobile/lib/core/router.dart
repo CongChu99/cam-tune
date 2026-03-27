@@ -14,6 +14,10 @@ import '../features/recommendation/recommendation_screen.dart';
 /// - /recommendation → [RecommendationScreen]
 final GoRouter appRouter = GoRouter(
   initialLocation: '/login',
+  redirect: (context, state) {
+    // TODO(cam-tune-mau.6): implement auth redirect when AuthNotifier is ready
+    return null;
+  },
   routes: [
     GoRoute(
       path: '/login',

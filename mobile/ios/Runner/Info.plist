@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CamTune sử dụng vị trí của bạn để cung cấp gợi ý thông số máy ảnh phù hợp với điều kiện ánh sáng tại địa điểm chụp.</string>
 </dict>
 </plist>
