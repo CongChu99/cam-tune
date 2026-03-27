@@ -116,7 +116,7 @@ async function fetchLocationName(lat: number, lng: number): Promise<string> {
     return parts.join(', ')
   }
 
-  return data.display_name ?? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+  return (typeof data.display_name === 'string' ? data.display_name : null) ?? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
 }
 
 // ─── Sun data ─────────────────────────────────────────────────────────────────
@@ -166,13 +166,13 @@ export async function getWeatherForecast(
     `&forecast_days=16` +
     `&timezone=auto`
 
-  const data = await httpsGet(url) as { hourly: Record<string, unknown[]>; daily: Record<string, string[]> }
+  const data = await httpsGet(url) as { hourly: Record<string, (number | string | null)[]>; daily: Record<string, string[]> }
   const hourly = data.hourly
   const daily = data.daily
 
   // Find the hourly index closest to targetDate
   const targetMs = targetDate.getTime()
-  const times: string[] = hourly.time ?? []
+  const times: string[] = (hourly.time ?? []).map(String)
   let bestIdx = 0
   let bestDiff = Infinity
 
@@ -195,15 +195,15 @@ export async function getWeatherForecast(
   const goldenHourStart = times2.goldenHour
   const goldenHourEnd = times2.sunsetStart
 
-  const visibilityRaw = hourly.visibility?.[bestIdx] ?? 0
+  const visibilityRaw = Number(hourly.visibility?.[bestIdx] ?? 0)
   const visibilityKm = Math.round((visibilityRaw / 1000) * 10) / 10
 
   return {
-    cloudCoverPct: hourly.cloud_cover?.[bestIdx] ?? 0,
-    uvIndex: hourly.uv_index?.[bestIdx] ?? 0,
+    cloudCoverPct: Number(hourly.cloud_cover?.[bestIdx] ?? 0),
+    uvIndex: Number(hourly.uv_index?.[bestIdx] ?? 0),
     visibilityKm,
-    temperature: hourly.temperature_2m?.[bestIdx] ?? 0,
-    humidity: hourly.relative_humidity_2m?.[bestIdx] ?? 0,
+    temperature: Number(hourly.temperature_2m?.[bestIdx] ?? 0),
+    humidity: Number(hourly.relative_humidity_2m?.[bestIdx] ?? 0),
     sunrise: sunriseStr,
     sunset: sunsetStr,
     goldenHourStart: goldenHourStart.toISOString(),

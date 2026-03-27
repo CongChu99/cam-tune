@@ -165,6 +165,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               : null,
           releaseYear: rawProfile.cameraDatabase.releaseYear ?? null,
           mount: rawProfile.cameraDatabase.mount ?? null,
+          maxFlashSyncSpeed: rawProfile.cameraDatabase.maxFlashSyncSpeed ?? null,
         }
       : null,
   }

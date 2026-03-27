@@ -12,7 +12,7 @@ export class ExifExtractorClient {
    */
   async extractLensModel(imageBuffer: Buffer | Uint8Array): Promise<string | null> {
     try {
-      const exif = await exifr.parse(imageBuffer, { LensModel: true })
+      const exif = await exifr.parse(imageBuffer, { pick: ['LensModel'] })
       if (!exif || typeof exif.LensModel !== 'string') return null
       const trimmed = exif.LensModel.trim()
       return trimmed || null

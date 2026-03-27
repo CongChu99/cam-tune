@@ -171,7 +171,14 @@ export async function matchExif(
   }
 
   if (bestConfidence >= CONFIDENCE_THRESHOLD) {
-    return { lens: bestLens, confidence: bestConfidence }
+    return {
+      lens: {
+        ...bestLens,
+        maxAperture: Number(bestLens.maxAperture),
+        lensType: String(bestLens.lensType),
+      },
+      confidence: bestConfidence,
+    }
   }
 
   // Below threshold — log and return null
