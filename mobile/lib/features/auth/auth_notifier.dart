@@ -137,9 +137,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Clears tokens and sets state to [AuthState.unauthenticated].
-  Future<void> logout() async {
+  /// [errorMessage] is optionally surfaced to the UI (e.g. session-expired).
+  Future<void> logout({String? errorMessage}) async {
     await _authService.logout();
-    state = const AuthState.unauthenticated();
+    state = AuthState.unauthenticated(errorMessage: errorMessage);
   }
 }
 

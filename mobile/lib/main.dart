@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -37,7 +38,15 @@ class AppStartup extends ConsumerWidget {
 }
 
 /// FutureProvider that calls [AuthNotifier.checkAuth] once on app startup.
+/// Also validates GOOGLE_CLIENT_ID is configured; logs a warning if not.
 final _startupProvider = FutureProvider<void>((ref) async {
+  // Fast-fail detection if client ID is not configured.
+  const clientId = String.fromEnvironment('GOOGLE_CLIENT_ID', defaultValue: '');
+  if (clientId.isEmpty) {
+    // In debug mode this will also be caught by the assert in AuthService.login().
+    // Log a warning but don't crash the app — show unauthenticated state.
+    debugPrint('WARNING: GOOGLE_CLIENT_ID is not set. OAuth login will fail.');
+  }
   await ref.read(authNotifierProvider.notifier).checkAuth();
 });
 

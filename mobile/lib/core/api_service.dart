@@ -60,9 +60,11 @@ class AuthInterceptor extends Interceptor {
     }
 
     // Guard against infinite retry loops: if this request was already retried
-    // once (after a token refresh), do not retry again — just log out.
+    // once (after a token refresh), propagate the error to the caller.
+    // Do NOT logout here — the refresh succeeded but the server still rejected
+    // the request (e.g. insufficient scope, suspended account). The caller
+    // decides what to do with a 401.
     if (err.requestOptions.extra['_retried'] == true) {
-      await _authNotifier.logout();
       return handler.next(err);
     }
 
@@ -73,20 +75,25 @@ class AuthInterceptor extends Interceptor {
       // Serialize concurrent 401s: if a refresh is already in flight,
       // await it instead of starting a second one.
       await _doRefresh();
-
-      // Retry the original request with the new token.
-      final newToken = await _authService.getAccessToken();
-      final retryOptions = err.requestOptions;
-      if (newToken != null) {
-        retryOptions.headers['Authorization'] = 'Bearer $newToken';
-      }
-
-      final response = await _dio.fetch(retryOptions);
-      return handler.resolve(response);
     } catch (_) {
-      // Refresh token is expired — force re-login.
-      await _authNotifier.logout();
+      // Refresh token is expired or invalid — session is truly over.
+      // Force re-login with the session-expired message (REQ-02).
+      await _authNotifier.logout(
+        errorMessage: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      );
       return handler.next(err);
+    }
+
+    // Refresh succeeded — retry the original request with the new token.
+    try {
+      final newToken = await _authService.getAccessToken();
+      if (newToken != null) {
+        err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+      }
+      final response = await _dio.fetch(err.requestOptions);
+      return handler.resolve(response);
+    } catch (retryErr) {
+      return handler.next(retryErr is DioException ? retryErr : err);
     }
   }
 
