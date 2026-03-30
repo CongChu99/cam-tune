@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'core/models/camera_profile_cache.dart';
+import 'core/models/recommendation_cache.dart';
 import 'core/router.dart';
 import 'features/auth/auth_notifier.dart';
 
@@ -11,6 +13,10 @@ Future<void> main() async {
 
   // Initialize Hive for offline storage
   await Hive.initFlutter();
+
+  // Register typed adapters before any box is opened.
+  if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(RecommendationCacheAdapter());
+  if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(CameraProfileCacheAdapter());
 
   runApp(
     const ProviderScope(

@@ -1,4 +1,4 @@
-import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class CacheService {
   // ── Box name constants ───────────────────────────────────────────────────────
@@ -44,8 +44,32 @@ class CacheService {
   /// Returns true when [DateTime.now()] is strictly after [cachedAt] + [ttlHours].
   /// Returns false otherwise (within TTL window).
   static bool isExpired(DateTime cachedAt, int? ttlHours) {
-    if (ttlHours == null || ttlHours == 0) return false;
+    if (ttlHours == null || ttlHours <= 0) return false;
     final expiresAt = cachedAt.add(Duration(hours: ttlHours));
     return DateTime.now().isAfter(expiresAt);
+  }
+
+  // ── evictExpired ─────────────────────────────────────────────────────────────
+
+  /// Evicts all entries from [boxName] where [getCachedAt] returns a [DateTime]
+  /// older than [ttlHours]. No-op if [ttlHours] is null or 0.
+  static Future<void> evictExpired<T>(
+    String boxName, {
+    required int? ttlHours,
+    required DateTime? Function(T value) getCachedAt,
+  }) async {
+    if (ttlHours == null || ttlHours <= 0) return;
+    final box = await _openBox(boxName);
+    final keysToDelete = <dynamic>[];
+    for (final key in box.keys) {
+      final value = box.get(key);
+      if (value is T) {
+        final cachedAt = getCachedAt(value);
+        if (cachedAt != null && isExpired(cachedAt, ttlHours)) {
+          keysToDelete.add(key);
+        }
+      }
+    }
+    await box.deleteAll(keysToDelete);
   }
 }
