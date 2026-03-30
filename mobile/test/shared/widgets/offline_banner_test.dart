@@ -1,6 +1,5 @@
 // offline_banner_test.dart
-// TDD RED phase: tests for OfflineBanner widget.
-// These tests FAIL until offline_banner.dart is implemented.
+// Tests for OfflineBanner widget — covers offline/reconnect display, auto-hide, animation
 
 import 'dart:async';
 
@@ -107,10 +106,9 @@ void main() {
       final container = tester.widget<Container>(
         find.byKey(const Key('offline_banner_container')),
       );
-      final decoration = container.decoration as BoxDecoration?;
-      expect(decoration?.color, isNotNull);
+      expect(container.color, isNotNull);
       // Expect a yellow-ish color (Colors.amber or Colors.yellow family).
-      final color = decoration!.color!;
+      final color = container.color!;
       // Yellow hue: high red + high green + low blue.
       expect(color.red, greaterThan(180));
       expect(color.green, greaterThan(140));
@@ -200,10 +198,9 @@ void main() {
       final container = tester.widget<Container>(
         find.byKey(const Key('offline_banner_container')),
       );
-      final decoration = container.decoration as BoxDecoration?;
-      expect(decoration?.color, isNotNull);
+      expect(container.color, isNotNull);
       // Expect a green-ish color.
-      final color = decoration!.color!;
+      final color = container.color!;
       expect(color.green, greaterThan(color.red));
       expect(color.green, greaterThan(color.blue));
 

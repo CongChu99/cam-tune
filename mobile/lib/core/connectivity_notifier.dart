@@ -1,6 +1,8 @@
 // connectivity_notifier.dart
 // Riverpod providers for monitoring network connectivity.
 
+import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,11 +12,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// offline. Exposed as a standalone provider so tests can override it with a
 /// fake [StreamController].
 final connectivityStreamProvider = Provider<Stream<bool>>((ref) {
-  return Connectivity().onConnectivityChanged.map(
-    (List<ConnectivityResult> results) =>
+  final controller = StreamController<bool>.broadcast();
+
+  final subscription = Connectivity().onConnectivityChanged.listen(
+    (List<ConnectivityResult> results) {
+      controller.add(
         results.isNotEmpty &&
-        !results.every((r) => r == ConnectivityResult.none),
+            !results.every((r) => r == ConnectivityResult.none),
+      );
+    },
+    onError: controller.addError,
+    onDone: controller.close,
   );
+
+  ref.onDispose(() {
+    subscription.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
 });
 
 // ─── StreamNotifier ───────────────────────────────────────────────────────────

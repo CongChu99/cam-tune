@@ -1,6 +1,5 @@
 // connectivity_notifier_test.dart
-// TDD RED phase: tests for ConnectivityNotifier Riverpod StreamNotifier.
-// These tests FAIL until connectivity_notifier.dart is implemented.
+// Tests for ConnectivityNotifier — covers stream contract, state transitions, isOnlineProvider
 
 import 'dart:async';
 

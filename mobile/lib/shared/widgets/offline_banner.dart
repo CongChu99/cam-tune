@@ -33,6 +33,7 @@ class _OfflineBannerState extends ConsumerState<OfflineBanner> {
   }
 
   void _onConnectivityChanged(bool isOnline) {
+    if (!mounted) return;
     _hideTimer?.cancel();
 
     if (isOnline) {
@@ -60,10 +61,9 @@ class _OfflineBannerState extends ConsumerState<OfflineBanner> {
 
     final bool visible = _mode != _BannerMode.hidden;
 
-    return AnimatedContainer(
+    return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-      height: visible ? null : 0,
       child: visible
           ? Container(
               key: const Key('offline_banner_container'),
