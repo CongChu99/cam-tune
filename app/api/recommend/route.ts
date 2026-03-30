@@ -22,10 +22,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
 import OpenAI from 'openai'
 
-import { authOptions } from '@/lib/auth'
+import { getAuthenticatedUser } from '@/lib/mobile-auth'
 import prisma from '@/lib/prisma'
 import { decryptApiKey, createClient, isOllamaMode } from '@/lib/openai-client'
 import { getLocationContext, type WeatherData, type SunData } from '@/lib/weather-service'
@@ -53,11 +52,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const startMs = Date.now()
 
   // ── Auth ────────────────────────────────────────────────────────────────────
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  const authUser = await getAuthenticatedUser(request)
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const userId = session.user.id
+  const userId = authUser.id
 
   // ── Parse body ──────────────────────────────────────────────────────────────
   let body: RecommendRequestBody

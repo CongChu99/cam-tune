@@ -67,4 +67,20 @@ export async function verifyRefreshToken(
   return payload as RefreshTokenPayload;
 }
 
+export interface AccessTokenPayload extends JWTPayload {
+  sub: string;
+  email: string;
+  type: "access" | "refresh";
+}
+
+export async function verifyAccessToken(
+  token: string
+): Promise<AccessTokenPayload> {
+  const { payload } = await jwtVerify(token, getSecret());
+  if (payload.type !== "access") {
+    throw new Error("Invalid token type: expected access token");
+  }
+  return payload as AccessTokenPayload;
+}
+
 export const ACCESS_EXPIRES_IN = ACCESS_TOKEN_TTL;
