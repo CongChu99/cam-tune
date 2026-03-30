@@ -1,9 +1,6 @@
-/**
- * Tests for lib/mobile-auth.ts — getAuthenticatedUser()
- * TDD: cam-tune-mau.2 — PHASE 1: RED
- *
- * Uses node environment because jose/JWT helpers require TextEncoder/Uint8Array.
- */
+// Tests for getAuthenticatedUser() — Bearer JWT + NextAuth session fallback
+//
+// Uses node environment because jose/JWT helpers require TextEncoder/Uint8Array.
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -26,7 +23,6 @@ import { verifyAccessToken } from '@/lib/mobile-jwt'
 import { getServerSession } from 'next-auth'
 import { NextRequest } from 'next/server'
 
-// Import the function under test — does NOT exist yet → RED
 import { getAuthenticatedUser } from '@/lib/mobile-auth'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -83,6 +79,33 @@ describe('getAuthenticatedUser — Bearer token path', () => {
 
     expect(user).toBeNull()
     expect(verifyAccessToken).not.toHaveBeenCalled()
+  })
+
+  it('returns null for non-Bearer Authorization (Basic) — does NOT fall back to session', async () => {
+    ;(getServerSession as any).mockResolvedValue({
+      user: { id: 'session-user-id', email: 'session@example.com' },
+    })
+
+    const req = makeRequest({ Authorization: 'Basic dXNlcjpwYXNz' })
+    const user = await getAuthenticatedUser(req)
+
+    expect(user).toBeNull()
+    expect(verifyAccessToken).not.toHaveBeenCalled()
+    // Session must NOT be consulted when any Authorization header is present
+    expect(getServerSession).not.toHaveBeenCalled()
+  })
+
+  it('returns null for non-Bearer Authorization (Token) — does NOT fall back to session', async () => {
+    ;(getServerSession as any).mockResolvedValue({
+      user: { id: 'session-user-id', email: 'session@example.com' },
+    })
+
+    const req = makeRequest({ Authorization: 'Token abc123' })
+    const user = await getAuthenticatedUser(req)
+
+    expect(user).toBeNull()
+    expect(verifyAccessToken).not.toHaveBeenCalled()
+    expect(getServerSession).not.toHaveBeenCalled()
   })
 })
 

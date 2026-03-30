@@ -22,8 +22,10 @@ export async function getAuthenticatedUser(
   const authHeader = request.headers.get('authorization')
 
   if (authHeader) {
-    // Bearer token path — no session fallback on failure
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+    // Any Authorization header (even non-Bearer) blocks session fallback.
+    // A Basic/Digest/Token header must not silently downgrade to a session.
+    if (!authHeader.startsWith('Bearer ')) return null
+    const token = authHeader.slice(7).trim()
     if (!token) return null
     try {
       const payload = await verifyAccessToken(token)

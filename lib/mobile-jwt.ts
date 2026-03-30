@@ -54,7 +54,7 @@ export async function signRefreshToken(userId: string): Promise<string> {
 
 export interface RefreshTokenPayload extends JWTPayload {
   sub: string;
-  type: "access" | "refresh";
+  type: "refresh";
 }
 
 export async function verifyRefreshToken(
@@ -70,7 +70,7 @@ export async function verifyRefreshToken(
 export interface AccessTokenPayload extends JWTPayload {
   sub: string;
   email: string;
-  type: "access" | "refresh";
+  type: "access";
 }
 
 export async function verifyAccessToken(

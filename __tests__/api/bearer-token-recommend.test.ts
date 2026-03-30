@@ -1,16 +1,8 @@
-/**
- * Tests for POST /api/recommend — Bearer token auth (additive, no web regression)
- * TDD: cam-tune-mau.2 — PHASE 1: RED
- *
- * Verifies that the recommend endpoint accepts Bearer token auth via
- * getAuthenticatedUser(), while preserving existing session-cookie behaviour.
- */
+// Tests for POST /api/recommend — Bearer token + session auth backward compat
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mock @/lib/mobile-auth before any imports ─────────────────────────────────
-// This is the new helper that the modified route will call instead of
-// getServerSession directly.  It doesn't exist yet → tests are RED.
 vi.mock('@/lib/mobile-auth', () => ({
   getAuthenticatedUser: vi.fn(),
 }))
