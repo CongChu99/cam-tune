@@ -47,5 +47,18 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>CamTune sử dụng vị trí của bạn để cung cấp gợi ý thông số máy ảnh phù hợp với điều kiện ánh sáng tại địa điểm chụp.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>com.camtune.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.camtune.app</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
